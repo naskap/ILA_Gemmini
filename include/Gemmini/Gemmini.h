@@ -166,7 +166,7 @@ struct store_statevars_t {
 
 Ila GetGemminiIla(const std::string& model_name = "Gemmini");
 extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory);
-void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory);
+extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory);
 
 }; // namespace Gemmini
 
