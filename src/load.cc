@@ -12,7 +12,6 @@ void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory) {
   DefineLoadStateVars(m, load_statevars);
   DefineConfigLoadInstructions(m, command, load_statevars);
   DefineLoadInstructions(m, command, memory, load_statevars);
-  std:: cout << "Defined load!!!\n";
 }
 
 void DefineLoadStateVars(Ila& m, load_statevars_t* load_statevars) {
@@ -103,7 +102,6 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
         accumulate     = false;
     }
 
-
     // Compute instruction name
     std:: string instr_name;
     if(is_acc_addr){
@@ -133,16 +131,18 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
 
 
     // Compute soc mem address (aka src address) for current row
-    auto soc_mem_offset = Concat(BvConst(0,48),load_statevars.cur_row)
+    auto soc_mem_offset = CastUnsigned(load_statevars.cur_row, 64)
                         * load_statevars.src_stride 
-                        + src_elmt_size_bv * Concat(BvConst(0,48),load_statevars.cur_col);
+                        + src_elmt_size_bv * CastUnsigned(load_statevars.cur_col, 64);
     auto soc_mem_addr = command.rs1 + soc_mem_offset;
     
     // Compute destination address
     auto submatrix   = load_statevars.cur_col / BvConst(ARRAY_DIM,16);
-    auto dest_offset = Concat(BvConst(0,16), load_statevars.cur_row) +
-                         (Concat(BvConst(0,16), submatrix) *  Concat(BvConst(0,16), load_statevars.dest_stride));
-    auto dest_addr = Concat(BvConst(0,3), Extract(command.rs2, 28, 0)) + dest_offset;
+    auto dest_offset = CastUnsigned(load_statevars.cur_row, 32) +
+                         (CastUnsigned(submatrix, 32) *  CastUnsigned(load_statevars.dest_stride, 32));
+    auto dest_addr = CastUnsigned(Extract(command.rs2, 28, 0), 32) + dest_offset;
+
+    
 
     // Calculate values to help load data from soc mem
     bool cast_to_acctype   = is_acc_addr && !acctype_inputs;
@@ -151,6 +151,7 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     
     // Note: Undefined what happens when num_src_cols is not a multiple of DIM 
     // Right now we're just transferring the whole submatrix
+
 
     // Load the first data entry 
     auto src_row               = Load(memory.soc_mem, soc_mem_addr);

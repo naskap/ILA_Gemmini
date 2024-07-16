@@ -147,26 +147,12 @@ struct gemmini_memory_t{
   ExprRef soc_mem     = (ExprRef) NULL;
 };
 
-struct maxpool_params_t {
-  ExprRef enable_and_stride = (ExprRef)NULL;
-  ExprRef window_size       = (ExprRef)NULL;
-  ExprRef upper_pad         = (ExprRef)NULL;
-  ExprRef left_pad          = (ExprRef)NULL;
-  ExprRef out_dim           = (ExprRef)NULL;
-  ExprRef out_rows          = (ExprRef)NULL;
-  ExprRef out_cols          = (ExprRef)NULL;
-  ExprRef in_rows           = (ExprRef)NULL;
-  ExprRef in_cols           = (ExprRef)NULL;
-};
-
-struct store_statevars_t {
-  ExprRef stride = (ExprRef)NULL;
-  maxpool_params_t maxpool_params;
-};
 
 Ila GetGemminiIla(const std::string& model_name = "Gemmini");
 extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory);
 extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory);
+
+extern ExprRef CastUnsigned(ExprRef to_cast, int bw);
 
 }; // namespace Gemmini
 

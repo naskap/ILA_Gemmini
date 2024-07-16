@@ -34,6 +34,8 @@ add_executable(${MyTarget}
   app/main.cc
   src/gemmini-top.cc
   src/load.cc
+  src/store.cc
+  src/utils.cc
 )
 
 target_include_directories(${MyTarget} PRIVATE include)

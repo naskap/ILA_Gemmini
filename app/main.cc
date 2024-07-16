@@ -9,6 +9,6 @@ using namespace ilang;
 int main() {
   auto m = Gemmini::GetGemminiIla("Gemmini");
   std::cout << "Successfully construct " << m << "\n";
-  ExportSysCSim(m,"./sim_model2");
+  ExportSysCSim(m,"./sim_model");
   return 0;
 }
