@@ -79,8 +79,6 @@ void DefineStoreInstruction(Ila& m, command_t command, gemmini_memory_t memory,
     DefineStoreChildInstruction(child, command, memory, store_statevars, true, false);
     DefineStoreChildInstruction(child, command, memory, store_statevars, false, false);
 
-
-
 }
 
 void DefineStoreChildInstruction(Ila& child, 
@@ -121,8 +119,8 @@ void DefineStoreChildInstruction(Ila& child,
     
     // Compute soc_mem_address (aka destination address)
     auto element_size   = Ite(read_acctype, BvConst(ACC_TYPE_WIDTH_BYTES,64), BvConst(INPUT_TYPE_WIDTH_BYTES, 64));
-    auto soc_mem_offset = (CastUnsigned(store_statevars.cur_row, 64)*store_statevars.stride)
-                            + (element_size * CastUnsigned(store_statevars.cur_col, 64));
+    auto soc_mem_offset = (ZExt(store_statevars.cur_row, 64)*store_statevars.stride)
+                            + (element_size * ZExt(store_statevars.cur_col, 64));
     auto soc_mem_address = soc_mem_base_address + soc_mem_offset;
 
     // Note: No mention of src_stride in the description of store 
@@ -131,8 +129,8 @@ void DefineStoreChildInstruction(Ila& child,
 
     // Compute src_address
     auto submatrix   = store_statevars.cur_col / BvConst(ARRAY_DIM,16);
-    auto src_offset  = CastUnsigned(store_statevars.cur_row, 32) + CastUnsigned(submatrix, 32) * CastUnsigned(num_rows, 32);
-    auto src_address = CastUnsigned(src_base_address, 32) + src_offset;
+    auto src_offset  = ZExt(store_statevars.cur_row, 32) + ZExt(submatrix, 32) * ZExt(num_rows, 32);
+    auto src_address = ZExt(src_base_address, 32) + src_offset;
 
     // Load a row of data
     auto src_mem = from_accumulator ?  memory.accumulator : memory.spad;
