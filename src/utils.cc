@@ -12,11 +12,13 @@ extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length){
     ExprRef slice = src  >>  idx_lo.ZExt(src.bit_width());
 
     // Mask out high bits
-    int mask = 0;
+    auto mask = BvConst(0, src.bit_width());
+    auto one  = BvConst(1, src.bit_width());
     for(int i = 0; i < length; i++){
-        mask |= (1 << i); 
+        auto i_bv = BvConst(i, src.bit_width());
+        mask = mask | (one << i_bv); 
     }
-    slice = slice & BvConst(mask, slice.bit_width());
+    slice = slice & mask;
     
     return Extract(slice, length - 1, 0);
 }
@@ -24,16 +26,20 @@ extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length){
 // Could also implement this by 1) masking out slice range 2) bitwise or with slice
 extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high){
     
-    auto to_return = BvConst(0,1);  // Workaround since empty bvs are not allowed (will be removed at the end)
-    for(int i = 0; i < dest_bv.bit_width(); i++){
-        auto i_bv              = BvConst(i,16);
-        auto bit_i_is_in_slice = (i_bv <= start_index_high) & (i_bv > (start_index_high - src_bv.bit_width()));
-             to_return         = Ite(bit_i_is_in_slice, 
-                Concat(to_return, Extract(src_bv,i,i) == 1), 
-                Concat(to_return, Extract(dest_bv,i,i) == 1));
+    ExprRef start_index_low = start_index_high - BvConst(src_bv.bit_width() - 1, start_index_high.bit_width());
+
+    auto mask = BvConst(0, dest_bv.bit_width());
+    auto one  = BvConst(1, dest_bv.bit_width());
+    for(int i = 0; i < src_bv.bit_width(); i++){
+        auto i_bv = BvConst(i, dest_bv.bit_width());
+        mask = mask | (one << i_bv); 
     }
+    mask = mask << start_index_low.ZExt(mask.bit_width());
+    mask = ~mask;
     
-    return Extract(to_return, to_return.bit_width() - 2,0);
+    auto to_return = dest_bv & mask; 
+    to_return = to_return | (src_bv.ZExt(mask.bit_width()) << start_index_low.ZExt(mask.bit_width()));
+    return to_return;
     
 }
 

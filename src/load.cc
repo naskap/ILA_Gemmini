@@ -28,7 +28,7 @@ void DefineLoadStateVars(Ila& m, load_statevars_t* load_statevars) {
     load_statevars[i].acc_type = 
         m.NewBoolState("load" + std::to_string(i) + "_acc_mvin_type");
     load_statevars[i].pixels_per_row = 
-        m.NewBvState("load" + std::to_string(i) + "_pixels_per_row", 16);
+        m.NewBvState("load" + std::to_string(i) + "_pixels_per_row", 8);
 
     // Load child helper variables
     load_statevars[i].child_valid = 
@@ -38,7 +38,7 @@ void DefineLoadStateVars(Ila& m, load_statevars_t* load_statevars) {
     load_statevars[i].cur_col = 
         m.NewBvState("load" + std::to_string(i) + "_cur_col", 16);
     load_statevars[i].cur_pixel = 
-        m.NewBvState("load" + std::to_string(i) + "_cur_pixel", 16);
+        m.NewBvState("load" + std::to_string(i) + "_cur_pixel", 8);
   }
 }
 
@@ -154,7 +154,7 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     auto num_rows      = Extract(command.rs2,63,48);
     auto num_cols      = Extract(command.rs2,47,32);
     auto dest_row = spad_row - ZExt(load_statevars.cur_pixel, 32);
-    auto dest_col = spad_col + load_statevars.cur_pixel * num_cols;
+    auto dest_col = spad_col + load_statevars.cur_pixel.ZExt(16) * num_cols;
 
     // Calculate values to help load data from soc mem
     bool cast_to_acctype   = is_acc_addr && !acctype_inputs;
@@ -193,10 +193,11 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     // Update state variables to transfer entire data array
     auto const_one = BvConst(1, 16);
     auto max_pixels = ZExt(load_statevars.pixels_per_row, 16);
-    load_row.SetUpdate(load_statevars.cur_pixel, WrappingAdd(load_statevars.cur_pixel, const_one, max_pixels));
+    auto cur_pixel_extended = load_statevars.cur_pixel.ZExt(16);
+    //load_row.SetUpdate(load_statevars.cur_pixel, WrappingAdd(cur_pixel_extended, const_one, max_pixels));
     
     auto new_col = load_statevars.cur_pixel == (load_statevars.pixels_per_row - 1);
-    load_row.SetUpdate(load_statevars.cur_col, Ite(new_col, WrappingAdd(load_statevars.cur_col, const_one, num_cols), load_statevars.cur_col));
+    //load_row.SetUpdate(load_statevars.cur_col, Ite(new_col, WrappingAdd(load_statevars.cur_col, const_one, num_cols), load_statevars.cur_col));
     
     auto new_row = new_col & (load_statevars.cur_col == (num_cols - 1));
     load_row.SetUpdate(load_statevars.cur_row, Ite(new_row, WrappingAdd(load_statevars.cur_row, const_one, num_rows), load_statevars.cur_row));
