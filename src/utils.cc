@@ -58,13 +58,9 @@ extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars,
     ExprRef iterate_next = BoolConst(true);
     while(iter_loop_vars != loop_vars.begin() - 1){
         
-        ILA_INFO << "Starting loop iter";
         // Read from iterators 
         auto loop_var = *iter_loop_vars;
         auto max = *iter_loop_maxs;
-
-        ILA_INFO << loop_var;
-        ILA_INFO << max;
         
 
         // Update iteration var

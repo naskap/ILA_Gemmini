@@ -190,19 +190,10 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
         load_elem.SetUpdate(memory.accumulator, acc_next);
     }
     
-    // Update state variables to transfer entire data array
-    auto const_one = BvConst(1, 16);
-    auto max_pixels = ZExt(load_statevars.pixels_per_row, 16);
-    auto cur_pixel_extended = load_statevars.cur_pixel.ZExt(16);
-    load_elem.SetUpdate(load_statevars.cur_pixel, WrappingAdd(cur_pixel_extended, const_one, max_pixels));
-    
-    auto new_col = load_statevars.cur_pixel == (load_statevars.pixels_per_row - 1);
-    load_elem.SetUpdate(load_statevars.cur_col, Ite(new_col, WrappingAdd(load_statevars.cur_col, const_one, num_cols), load_statevars.cur_col));
-    
-    auto new_row = new_col & (load_statevars.cur_col == (num_cols - 1));
-    load_elem.SetUpdate(load_statevars.cur_row, Ite(new_row, WrappingAdd(load_statevars.cur_row, const_one, num_rows), load_statevars.cur_row));
-    
-    auto last_pixel = new_row & load_statevars.cur_row == (num_rows - 1);
+
+    std::vector<ExprRef> iteration_vars = {load_statevars.cur_row, load_statevars.cur_col, load_statevars.cur_pixel};
+    std::vector<ExprRef> iteration_maxs = {num_rows, num_cols, load_statevars.pixels_per_row};
+    auto last_pixel = IterateLoopVars(load_elem, iteration_vars, iteration_maxs);
     load_elem.SetUpdate(load_statevars.child_valid, !(last_pixel));
 }
 
