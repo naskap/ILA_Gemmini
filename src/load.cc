@@ -122,15 +122,15 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     ILA_INFO << instr_name;
 
     // Declare instruction
-    auto load_row = child.NewInstr(instr_name);
+    auto load_elem = child.NewInstr(instr_name);
 
     // Decode instruction
     if(is_acc_addr){
-        load_row.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)) &
+        load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)) &
                         (load_statevars.acc_type == BoolConst(acctype_inputs)) &
                         (Extract(command.rs2, 30, 30) == BvConst(accumulate,1))); 
     }else{
-        load_row.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)));
+        load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)));
     }
 
     // Compute src element size
@@ -184,26 +184,26 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     // Store the row of data in spad or acc
     if(!is_acc_addr){
         auto spad_next = Store(memory.spad, dest_row, row_to_store);
-        load_row.SetUpdate(memory.spad, spad_next); 
+        load_elem.SetUpdate(memory.spad, spad_next); 
     } else{
         auto acc_next = Store(memory.accumulator, dest_row, row_to_store);
-        load_row.SetUpdate(memory.accumulator, acc_next);
+        load_elem.SetUpdate(memory.accumulator, acc_next);
     }
     
     // Update state variables to transfer entire data array
     auto const_one = BvConst(1, 16);
     auto max_pixels = ZExt(load_statevars.pixels_per_row, 16);
     auto cur_pixel_extended = load_statevars.cur_pixel.ZExt(16);
-    load_row.SetUpdate(load_statevars.cur_pixel, WrappingAdd(cur_pixel_extended, const_one, max_pixels));
+    load_elem.SetUpdate(load_statevars.cur_pixel, WrappingAdd(cur_pixel_extended, const_one, max_pixels));
     
     auto new_col = load_statevars.cur_pixel == (load_statevars.pixels_per_row - 1);
-    load_row.SetUpdate(load_statevars.cur_col, Ite(new_col, WrappingAdd(load_statevars.cur_col, const_one, num_cols), load_statevars.cur_col));
+    load_elem.SetUpdate(load_statevars.cur_col, Ite(new_col, WrappingAdd(load_statevars.cur_col, const_one, num_cols), load_statevars.cur_col));
     
     auto new_row = new_col & (load_statevars.cur_col == (num_cols - 1));
-    load_row.SetUpdate(load_statevars.cur_row, Ite(new_row, WrappingAdd(load_statevars.cur_row, const_one, num_rows), load_statevars.cur_row));
+    load_elem.SetUpdate(load_statevars.cur_row, Ite(new_row, WrappingAdd(load_statevars.cur_row, const_one, num_rows), load_statevars.cur_row));
     
     auto last_pixel = new_row & load_statevars.cur_row == (num_rows - 1);
-    load_row.SetUpdate(load_statevars.child_valid, !(last_pixel));
+    load_elem.SetUpdate(load_statevars.child_valid, !(last_pixel));
 }
 
 } // Gemmini
