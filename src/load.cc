@@ -194,10 +194,10 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     auto const_one = BvConst(1, 16);
     auto max_pixels = ZExt(load_statevars.pixels_per_row, 16);
     auto cur_pixel_extended = load_statevars.cur_pixel.ZExt(16);
-    //load_row.SetUpdate(load_statevars.cur_pixel, WrappingAdd(cur_pixel_extended, const_one, max_pixels));
+    load_row.SetUpdate(load_statevars.cur_pixel, WrappingAdd(cur_pixel_extended, const_one, max_pixels));
     
     auto new_col = load_statevars.cur_pixel == (load_statevars.pixels_per_row - 1);
-    //load_row.SetUpdate(load_statevars.cur_col, Ite(new_col, WrappingAdd(load_statevars.cur_col, const_one, num_cols), load_statevars.cur_col));
+    load_row.SetUpdate(load_statevars.cur_col, Ite(new_col, WrappingAdd(load_statevars.cur_col, const_one, num_cols), load_statevars.cur_col));
     
     auto new_row = new_col & (load_statevars.cur_col == (num_cols - 1));
     load_row.SetUpdate(load_statevars.cur_row, Ite(new_row, WrappingAdd(load_statevars.cur_row, const_one, num_rows), load_statevars.cur_row));
