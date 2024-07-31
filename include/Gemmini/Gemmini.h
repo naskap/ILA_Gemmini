@@ -152,10 +152,12 @@ Ila GetGemminiIla(const std::string& model_name = "Gemmini");
 extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory);
 extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory);
 
+extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length);
 extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high);
 extern ExprRef AccSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high);
 extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int addresses);
 extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max);
+extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_maximums);
 
 }; // namespace Gemmini
 
