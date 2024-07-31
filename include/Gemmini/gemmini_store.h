@@ -26,6 +26,10 @@ struct store_statevars_t {
   ExprRef child_valid = (ExprRef) NULL;
   ExprRef cur_row     = (ExprRef) NULL;
   ExprRef cur_col     = (ExprRef) NULL;
+  ExprRef cur_ch      = (ExprRef) NULL;
+  ExprRef cur_wrow    = (ExprRef) NULL;
+  ExprRef cur_wcol    = (ExprRef) NULL;
+  ExprRef cur_max     = (ExprRef) NULL;
 };
 
 void DefineStoreStateVars(Ila& m, store_statevars_t& store_statevars);
@@ -38,7 +42,8 @@ void DefineStoreChildInstruction(Ila& child,
                                 gemmini_memory_t memory, 
                                 store_statevars_t store_statevars, 
                                 bool from_accumulator,
-                                bool cast_to_intype);
+                                bool cast_to_intype,
+                                bool maxpool);
 
 
 
