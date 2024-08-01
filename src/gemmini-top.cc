@@ -20,11 +20,11 @@ Ila GetGemminiIla(const std::string& model_name) {
   // Define memory
   gemmini_memory_t memory;
   memory.spad          = m.NewMemState("spad", SPAD_ADDRESS_WIDTH, SPAD_ROW_WIDTH);
+  memory.spad.SetEntryNum(SPAD_ENTRIES);
   memory.accumulator   = m.NewMemState("accumulator", SPAD_ADDRESS_WIDTH, ACC_ROW_WIDTH);
+  memory.accumulator.SetEntryNum(ACC_ENTRIES);
   memory.soc_mem = 
       m.NewMemState("soc_mem", SOC_MEM_ADDRESS_WIDTH, SOC_MEM_ELEMENT_BITS);
-
-
 
   DefineLoad(m, command, memory);
   DefineStore(m, command, memory);

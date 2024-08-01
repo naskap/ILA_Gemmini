@@ -72,6 +72,9 @@
 #define RESET 16
 #define COMPUTE_CISC 17
 #define COUNTER_OP 126
+
+#define SPAD_ENTRIES 1024 * 256
+#define ACC_ENTRIES 1024 * 64
 // #define GARBAGE_ADDR       "hffffffff"
 // #define MVIN_RS2_ADDR_WIDTH  32
 // #define MVIN_RS2_COLS_WIDTH  16
