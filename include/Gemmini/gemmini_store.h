@@ -20,7 +20,9 @@ struct maxpool_params_t {
 };
 
 struct store_statevars_t {
-  ExprRef stride = (ExprRef)NULL;
+  ExprRef accScale   = (ExprRef)NULL;
+  ExprRef stride     = (ExprRef)NULL;
+  ExprRef activation = (ExprRef)NULL;
   maxpool_params_t maxpool_params;
 
   ExprRef child_valid = (ExprRef) NULL;
@@ -31,6 +33,8 @@ struct store_statevars_t {
   ExprRef cur_wcol    = (ExprRef) NULL;
   ExprRef cur_max     = (ExprRef) NULL;
 };
+
+enum Activation {NONE, ReLU};
 
 void DefineStoreStateVars(Ila& m, store_statevars_t& store_statevars);
 void DefineConfigStoreInstruction(Ila& m, command_t command,

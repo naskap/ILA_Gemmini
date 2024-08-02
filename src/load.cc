@@ -61,7 +61,7 @@ void DefineConfigLoadInstructions(Ila& m, command_t command,
     config_load[i].SetUpdate(load_statevars[i].dest_stride, Extract(command.rs1, 31, 16));
     config_load[i].SetUpdate(load_statevars[i].scale, Extract(command.rs1, 63, 32));
     config_load[i].SetUpdate(load_statevars[i].src_stride, command.rs2);
-    auto pixels_per_row_raw = Extract(command.rs1, 15, 8);
+    auto pixels_per_row_raw         = Extract(command.rs1, 15, 8);
     auto pixels_per_row_zero_is_one = Ite(pixels_per_row_raw == 0, BvConst(1,8), pixels_per_row_raw);
     config_load[i].SetUpdate(load_statevars[i].pixels_per_row, pixels_per_row_zero_is_one);
     
@@ -111,7 +111,7 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     }
 
     // Compute instruction name
-    std::string instr_name;
+    std:: string instr_name;
     if(is_acc_addr){
         std::string inputtype      = acctype_inputs  ? "acctype" : "inputtype";
         std::string load_operation = accumulate ? "accumulate" : "overwrite";
@@ -146,13 +146,13 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     
     // Compute spad row and column address
     auto base_row_address = ZExt(Extract(command.rs2, 28, 0), 32);
-    auto block   = load_statevars.cur_col / BvConst(ARRAY_DIM,16);
-    auto spad_col = load_statevars.cur_col - block * BvConst(ARRAY_DIM, 16); // Equiv to cur_col % ARRAY_DIM
-    auto spad_row = base_row_address + ZExt(load_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(load_statevars.dest_stride, 32);
+    auto block            = load_statevars.cur_col / BvConst(ARRAY_DIM,16);
+    auto spad_col         = load_statevars.cur_col - block * BvConst(ARRAY_DIM, 16);                                                       // Equiv to cur_col % ARRAY_DIM
+    auto spad_row         = base_row_address + ZExt(load_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(load_statevars.dest_stride, 32);
     
     // Compute destination row and column address
-    auto num_rows      = Extract(command.rs2,63,48);
-    auto num_cols      = Extract(command.rs2,47,32);
+    auto num_rows = Extract(command.rs2,63,48);
+    auto num_cols = Extract(command.rs2,47,32);
     auto dest_row = spad_row - ZExt(load_statevars.cur_pixel, 32);
     auto dest_col = spad_col + load_statevars.cur_pixel.ZExt(16) * num_cols;
 
@@ -162,8 +162,15 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     
     // Load src element
     auto src_elmt = LoadMulti(memory.soc_mem, soc_mem_addr, src_elmt_size);
+
+    // Mvin scaling 
+    if(!acctype_inputs){
+        src_elmt = ScaleInputType(src_elmt, load_statevars.scale);
+    }
+
+    // Cast to acctype
     if(cast_to_acctype){
-        src_elmt = ZExt(src_elmt, ACC_TYPE_WIDTH_BITS);
+        src_elmt = SExt(src_elmt, ACC_TYPE_WIDTH_BITS);
     }
 
     // Compute row to store
@@ -173,12 +180,12 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     }else{
         dest_row_data = Load(memory.spad, dest_row);
     }
-    ExprRef row_to_store = (ExprRef) NULL;
-    auto dest_col_reindexed = BvConst(ARRAY_DIM * src_elmt_size, 16) - dest_col - 1;
+    ExprRef row_to_store   = (ExprRef) NULL;
+    auto    dest_slice_idx = BvConst(ARRAY_DIM * src_elmt_size, 16) - dest_col * src_elmt_size - 1;
     if(accumulate){
-        row_to_store = AccSlice(dest_row_data, src_elmt, dest_col_reindexed);
+        row_to_store = AccSlice(dest_row_data, src_elmt, dest_slice_idx);
     }else{
-        row_to_store = SetSlice(dest_row_data, src_elmt, dest_col_reindexed);
+        row_to_store = SetSlice(dest_row_data, src_elmt, dest_slice_idx);
     }
     
     // Store the row of data in spad or acc
@@ -190,10 +197,10 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
         load_elem.SetUpdate(memory.accumulator, acc_next);
     }
     
-
+    // Iterate loop variables
     std::vector<ExprRef> iteration_vars = {load_statevars.cur_row, load_statevars.cur_col, load_statevars.cur_pixel};
     std::vector<ExprRef> iteration_maxs = {num_rows, num_cols, load_statevars.pixels_per_row};
-    auto last_pixel = IterateLoopVars(load_elem, iteration_vars, iteration_maxs);
+    auto last_pixel                     = IterateLoopVars(load_elem, iteration_vars, iteration_maxs);
     load_elem.SetUpdate(load_statevars.child_valid, !(last_pixel));
 }
 

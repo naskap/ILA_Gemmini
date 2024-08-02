@@ -17,7 +17,9 @@ void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory) {
 void DefineStoreStateVars(Ila& m, store_statevars_t& store_statevars) {
 
     // Store configs
-    store_statevars.stride                           = m.NewBvState("store_stride", 64);
+    store_statevars.stride                           = m.NewBvState("store_stride", 32);
+    store_statevars.accScale                         = m.NewBvState("store_accScale", 32);
+    store_statevars.activation                       = m.NewBvState("store_activation", 2);
     store_statevars.maxpool_params.enable_and_stride = m.NewBvState("store_maxpool_enable_and_stride", 2);
     store_statevars.maxpool_params.window_size       = m.NewBvState("store_maxpool_window_size", 2);
     store_statevars.maxpool_params.upper_pad         = m.NewBvState("store_maxpool_upper_pad", 2);
@@ -50,7 +52,9 @@ void DefineConfigStoreInstruction(Ila& m, command_t command,
                            (Extract(command.rs1, 1, 0) == 2));
 
     // Define update functions
-    config_store.SetUpdate(store_statevars.stride, command.rs2);
+    config_store.SetUpdate(store_statevars.accScale, Extract(command.rs2,63,32));
+    config_store.SetUpdate(store_statevars.stride, Extract(command.rs2,31,0));
+    config_store.SetUpdate(store_statevars.activation, Extract(command.rs1,3,2));
     config_store.SetUpdate(store_statevars.maxpool_params.enable_and_stride, Extract(command.rs1, 5,4));
     config_store.SetUpdate(store_statevars.maxpool_params.window_size, Extract(command.rs1, 7,6));
     config_store.SetUpdate(store_statevars.maxpool_params.upper_pad, Extract(command.rs1, 9,8));
@@ -144,8 +148,10 @@ void DefineStoreChildInstruction(Ila& child,
         auto ocol     = store_statevars.cur_col.ZExt(32) * maxp_params.enable_and_stride.ZExt(32) + store_statevars.cur_wcol.ZExt(32) - maxp_params.left_pad.ZExt(32);
         auto row_addr = src_base_address.ZExt(32) + orow* maxp_params.out_cols.ZExt(32) + ocol;
 
-
-        int     elem_size      = from_accumulator && acctype ? ACC_TYPE_WIDTH_BITS : INPUT_TYPE_WIDTH_BITS;
+        // Note: spike simulation doesn't honor address bit 29 for maxpool
+        int elem_size = from_accumulator ? ACC_TYPE_WIDTH_BITS : INPUT_TYPE_WIDTH_BITS;
+        
+        
         int     row_size       = elem_size * ARRAY_DIM;
         ExprRef elem           = (ExprRef) BvConst(0, elem_size);
         ExprRef elem_offset_hi = BvConst(row_size, 16) - store_statevars.cur_ch * BvConst(elem_size, 16);
@@ -157,18 +163,23 @@ void DefineStoreChildInstruction(Ila& child,
         if(from_accumulator){
             auto acc_row   = Load(memory.accumulator,row_addr);
             auto acc_value = GetSlice(acc_row, elem_offset_hi, elem_size);
-            // < Insert scaling and activation code> 
-            elem = Ite((!cond_out_of_bounds), acc_value, elem);
+            if(acctype){
+
+            }else{
+
+            }
+            auto acc_value_scaled = ScaleAccType(acc_value, store_statevars.accScale);
+                 elem             = Ite((!cond_out_of_bounds), acc_value_scaled, elem);
         }else{
             // Handle spad case
             auto spad_row   = Load(memory.spad, row_addr);
             auto spad_value = GetSlice(spad_row, elem_offset_hi, elem_size);
-                elem       = Ite((!cond_out_of_bounds), spad_value, elem);
+                 elem       = Ite((!cond_out_of_bounds), spad_value, elem);
         }
 
         //  Update max
         auto elem_extended = elem.SExt(ACC_TYPE_WIDTH_BITS);
-        auto updated_max = Ite(elem_extended > store_statevars.cur_max, elem_extended, store_statevars.cur_max);
+        auto updated_max   = Ite(elem_extended > store_statevars.cur_max, elem_extended, store_statevars.cur_max);
         store_elem.SetUpdate(store_statevars.cur_max, updated_max);
 
         // Update state variables
@@ -189,37 +200,40 @@ void DefineStoreChildInstruction(Ila& child,
     }else{
 
         // Compute soc_mem_address (aka destination address)
-        auto element_size   = Ite(read_acctype, BvConst(ACC_TYPE_WIDTH_BYTES,64), BvConst(INPUT_TYPE_WIDTH_BYTES, 64));
-        auto soc_mem_offset = (ZExt(store_statevars.cur_row, 64)*store_statevars.stride)
-                                + (element_size * ZExt(store_statevars.cur_col, 64));
+        auto store_elmt_size_bytes = Ite(read_acctype, BvConst(ACC_TYPE_WIDTH_BYTES,64), BvConst(INPUT_TYPE_WIDTH_BYTES, 64));
+        auto soc_mem_offset        = (ZExt(store_statevars.cur_row, 64)*store_statevars.stride.ZExt(64))
+                                + (store_elmt_size_bytes * ZExt(store_statevars.cur_col, 64));
         auto soc_mem_address = soc_mem_base_address + soc_mem_offset;
 
-        // Compute src_address
-        auto submatrix   = store_statevars.cur_col / BvConst(ARRAY_DIM,16);
-        auto src_offset  = ZExt(store_statevars.cur_row, 32) + ZExt(submatrix, 32) * ZExt(num_rows, 32);
-        auto src_address = ZExt(src_base_address, 32) + src_offset;
 
-        // Load a row of data
-        auto src_mem = from_accumulator ?  memory.accumulator : memory.spad;
-        auto src_row = Load(src_mem, src_address);
+        // Compute spad address
+        int  load_elmt_size    = from_accumulator ? ACC_TYPE_WIDTH_BITS : INPUT_TYPE_WIDTH_BITS;
+        auto load_elmt_size_bv = BvConst(load_elmt_size, 16);
+        auto array_dim_bv      = BvConst(ARRAY_DIM, 16);
+        auto block             = store_statevars.cur_col / array_dim_bv;
+        auto spad_col          = store_statevars.cur_col - block * array_dim_bv;                                                            // Equiv to cur_col % ARRAY_DIM
+        auto spad_row          = src_base_address.ZExt(32) + ZExt(store_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(array_dim_bv, 32);
+        auto slice_idx_hi      = array_dim_bv * load_elmt_size_bv - spad_col * load_elmt_size_bv - 1;
+    
+        // Load data
+        auto src_mem  = from_accumulator ?  memory.accumulator : memory.spad;
+        auto src_row  = Load(src_mem, spad_row);
+        auto src_elmt = GetSlice(src_row, slice_idx_hi, load_elmt_size);
 
-        // Cast accType to inType if necessary
-        auto to_store = (ExprRef) NULL;
         if(from_accumulator && !acctype){
-            to_store = Extract(src_row, INPUT_TYPE_WIDTH_BITS - 1, 0);
-            for(int i = 1; i < ARRAY_DIM; i++){
-                to_store = Concat(Extract(src_row, INPUT_TYPE_WIDTH_BITS*(i+1) - 1, INPUT_TYPE_WIDTH_BITS*i), to_store);
-            }
-        }else{
-            to_store = src_row;
-        }
+            
+            // Apply scale
+            src_elmt = ScaleAccType(src_elmt, store_statevars.accScale);
+
+            // Apply activation
+            // Note only NONE and ReLU are implemented as activation functions
+            src_elmt = Ite(store_statevars.activation == BvConst(Activation::NONE, 2), CastAccTypeToInputType(src_elmt),
+                       Ite(store_statevars.activation == BvConst(Activation::ReLU, 2), ReLUCast(src_elmt), BvConst(0, INPUT_TYPE_WIDTH_BITS)));
         
-        // Store row
-        auto soc_mem_next = memory.soc_mem;
-        for(int i = 0; i < (to_store.bit_width() / 8); i++){
-            soc_mem_next = Store(soc_mem_next, soc_mem_address + i, 
-                                Extract(to_store, 8*(i+1) -1, 8*i));
         }
+
+        // Store src_elmt
+        auto soc_mem_next = StoreMulti(memory.soc_mem, src_elmt, soc_mem_address);
 
         // Update state variables
         std::vector<ExprRef> iteration_vars = {store_statevars.cur_row, 

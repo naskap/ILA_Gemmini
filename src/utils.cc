@@ -9,7 +9,7 @@ extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length){
 
     // Shift to get rid of low bits
     ExprRef idx_lo = idx_hi - BvConst(length -1,idx_hi.bit_width());
-    ExprRef slice = src  >>  idx_lo.ZExt(src.bit_width());
+    ExprRef slice  = src  >>  idx_lo.ZExt(src.bit_width());
 
     // Extract low bits
     return Extract(slice, length - 1, 0);
@@ -22,11 +22,11 @@ extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_hi
 
     // Create mask
     auto mask = ~BvConst(0, src_bv.bit_width());
-    mask = mask.ZExt(dest_bv.bit_width());
-    mask = mask << start_index_low.ZExt(dest_bv.bit_width());
+         mask = mask.ZExt(dest_bv.bit_width());
+         mask = mask << start_index_low.ZExt(dest_bv.bit_width());
     
-    auto to_return = dest_bv & mask; 
-    to_return = to_return | (src_bv.ZExt(mask.bit_width()) << start_index_low.ZExt(mask.bit_width()));
+    auto to_return = dest_bv & mask;
+         to_return = to_return | (src_bv.ZExt(mask.bit_width()) << start_index_low.ZExt(mask.bit_width()));
     return to_return;
     
 }
@@ -44,7 +44,7 @@ extern ExprRef AccSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_hi
 extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max){
 
     auto unwrapped_result = num1 + num2;
-    auto max_extended = max.ZExt(unwrapped_result.bit_width());
+    auto max_extended     = max.ZExt(unwrapped_result.bit_width());
     return Ite(unwrapped_result >= max_extended, unwrapped_result - max_extended, unwrapped_result);
 }
 
@@ -60,7 +60,7 @@ extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars,
         
         // Read from iterators 
         auto loop_var = *iter_loop_vars;
-        auto max = *iter_loop_maxs;
+        auto max      = *iter_loop_maxs;
         
 
         // Update iteration var
@@ -80,12 +80,12 @@ extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars,
 }
 
 
-extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int addresses){
+extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int num_addrs){
         // Load the first byte of data
     auto src_elmt = Load(memory, addr);
 
     // Load the rest of the bytes
-    for(int i = 1; i < addresses; i++){
+    for(int i = 1; i < num_addrs; i++){
         src_elmt = Concat(src_elmt, Load(memory, addr+i));
         
     }
@@ -93,6 +93,41 @@ extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int addresses){
 
 }
 
+extern ExprRef StoreMulti(ExprRef &memory, ExprRef &to_store, ExprRef &start_addr){
+    auto memory_next = memory;
+    auto data_width  = memory.data_width();
+    for(int i = 0; i < (to_store.bit_width() / data_width); i++){
+        memory_next = Store(memory_next, start_addr + BvConst(i, start_addr.bit_width()), 
+                            Extract(to_store, data_width*(i+1) - 1, data_width*i));
+    }
+    return memory_next;
+}
 
+ExprRef _clamp(ExprRef &to_clamp, ExprRef lo, ExprRef hi){
+    return Ite(to_clamp > hi, hi,
+           Ite(to_clamp < lo, lo, to_clamp));
+}
+
+// Note: Assumes signed types
+extern ExprRef CastAccTypeToInputType(ExprRef &accTypeElmt){
+    
+    // Clamp element to inputtype range
+    auto input_type_max = BvConst(1 << (INPUT_TYPE_WIDTH_BITS -1) - 1, ACC_TYPE_WIDTH_BITS);
+    auto input_type_min = BvConst(1 << (INPUT_TYPE_WIDTH_BITS -1), ACC_TYPE_WIDTH_BITS);
+    auto elmt_clamped   = _clamp(accTypeElmt, input_type_min, input_type_max);
+    
+    auto elmt_casted = Extract(elmt_clamped, INPUT_TYPE_WIDTH_BITS - 1, 0);
+    return elmt_casted;
+
+}
+
+extern ExprRef ReLUCast(ExprRef &accTypeElmt){
+    
+    auto input_type_max = BvConst(1 << (INPUT_TYPE_WIDTH_BITS -1) - 1, ACC_TYPE_WIDTH_BITS);
+    auto clamped_elmt   = _clamp(accTypeElmt, BvConst(0, ACC_TYPE_WIDTH_BITS), input_type_max);
+    
+    auto elmt_casted = Extract(clamped_elmt, INPUT_TYPE_WIDTH_BITS - 1, 0);
+    return elmt_casted;
+}
 }
 }

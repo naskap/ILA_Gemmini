@@ -159,8 +159,18 @@ extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length);
 extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high);
 extern ExprRef AccSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high);
 extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int addresses);
+extern ExprRef StoreMulti(ExprRef &memory, ExprRef &to_store, ExprRef &start_addr);
 extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max);
 extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_maximums);
+extern ExprRef CastAccTypeToInputType(ExprRef &accTypeElmt);
+extern ExprRef ReLUCast(ExprRef &accTypeElmt);
+
+// Uninterpreted functions
+static auto scale = SortRef::BV(32);
+static auto inputtype_sort = SortRef::BV(INPUT_TYPE_WIDTH_BITS);
+static auto acctype_sort = SortRef::BV(ACC_TYPE_WIDTH_BITS);
+static FuncRef ScaleInputType("ScaleInputType", inputtype_sort, inputtype_sort, scale);
+static FuncRef ScaleAccType("ScaleAccType", acctype_sort, acctype_sort, scale);
 
 }; // namespace Gemmini
 
