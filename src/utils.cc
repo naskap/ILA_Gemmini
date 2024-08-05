@@ -24,6 +24,7 @@ extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_hi
     auto mask = ~BvConst(0, src_bv.bit_width());
          mask = mask.ZExt(dest_bv.bit_width());
          mask = mask << start_index_low.ZExt(dest_bv.bit_width());
+         mask = ~mask;
     
     auto to_return = dest_bv & mask;
          to_return = to_return | (src_bv.ZExt(mask.bit_width()) << start_index_low.ZExt(mask.bit_width()));

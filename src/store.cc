@@ -243,6 +243,7 @@ void DefineStoreChildInstruction(Ila& child,
         
         auto last_pixel = IterateLoopVars(store_elem, iteration_vars, iteration_maxs);
         store_elem.SetUpdate(store_statevars.child_valid, !(last_pixel));
+        store_elem.SetUpdate(memory.soc_mem, soc_mem_next);
     }
 
 }

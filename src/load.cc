@@ -181,7 +181,8 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
         dest_row_data = Load(memory.spad, dest_row);
     }
     ExprRef row_to_store   = (ExprRef) NULL;
-    auto    dest_slice_idx = BvConst(ARRAY_DIM * src_elmt_size, 16) - dest_col * src_elmt_size - 1;
+    auto src_elmt_size_bits = src_elmt_size * 8;
+    auto    dest_slice_idx = BvConst(ARRAY_DIM * src_elmt_size_bits, 16) - dest_col * src_elmt_size_bits - 1;
     if(accumulate){
         row_to_store = AccSlice(dest_row_data, src_elmt, dest_slice_idx);
     }else{
