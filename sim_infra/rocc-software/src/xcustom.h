@@ -152,8 +152,8 @@
                                                           \
     opcode      = OPCODE_CUSTOM3;                                  \
     funct_write = func7;                                           \
-    rs1         = (uint64_t) rs1_val;                                          \
-    rs2         = rs2_val;                                          \
+    rs1         = (uint64_t) (rs1_val);                                          \
+    rs2         = (uint64_t) (rs2_val);                                          \
     wait(1, SC_SEC);                                            \
   } \
   
