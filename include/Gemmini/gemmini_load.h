@@ -12,7 +12,7 @@ struct load_statevars_t {
   ExprRef src_stride     = (ExprRef)NULL;  // Main memory stride in bytes
   ExprRef dest_stride    = (ExprRef)NULL;  // spad stride in bytes
   ExprRef scale          = (ExprRef)NULL;  // mvin scale (ignored if gemmini not configured with this ability)
-  ExprRef acc_type       = (ExprRef)NULL;
+  ExprRef read_inputType       = (ExprRef)NULL;
   ExprRef pixels_per_row = (ExprRef)NULL;
   
   // Child ILA helpers

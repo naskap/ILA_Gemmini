@@ -25,8 +25,8 @@ void DefineLoadStateVars(Ila& m, load_statevars_t* load_statevars) {
         m.NewBvState("load" + std::to_string(i) + "_dest_stride", 16);
     load_statevars[i].scale = 
         m.NewBvState("load" + std::to_string(i) + "_scale", 32);
-    load_statevars[i].acc_type = 
-        m.NewBoolState("load" + std::to_string(i) + "_acc_mvin_type");
+    load_statevars[i].read_inputType = 
+        m.NewBoolState("load" + std::to_string(i) + "_read_inputType");
     load_statevars[i].pixels_per_row = 
         m.NewBvState("load" + std::to_string(i) + "_pixels_per_row", 8);
 
@@ -57,7 +57,7 @@ void DefineConfigLoadInstructions(Ila& m, command_t command,
                              (Extract(command.rs1, 4, 3) == i));
 
     // Define update functions
-    config_load[i].SetUpdate(load_statevars[i].acc_type, Extract(command.rs1, 2, 2) == 1);
+    config_load[i].SetUpdate(load_statevars[i].read_inputType, Extract(command.rs1, 2, 2) == 1);
     config_load[i].SetUpdate(load_statevars[i].dest_stride, Extract(command.rs1, 31, 16));
     config_load[i].SetUpdate(load_statevars[i].scale, Extract(command.rs1, 63, 32));
     config_load[i].SetUpdate(load_statevars[i].src_stride, command.rs2);
@@ -101,19 +101,19 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
                                 command_t command, 
                                 gemmini_memory_t memory, 
                                 load_statevars_t load_statevars, 
-                                bool is_acc_addr, bool acctype_inputs, 
+                                bool is_acc_addr, bool read_inputtype, 
                                 bool accumulate){
     
     // Disable nonapplicable options if destination address is scratchpad
     if(!is_acc_addr){
-        acctype_inputs = false;
+        read_inputtype = true;
         accumulate     = false;
     }
 
     // Compute instruction name
     std:: string instr_name;
     if(is_acc_addr){
-        std::string inputtype      = acctype_inputs  ? "acctype" : "inputtype";
+        std::string inputtype      = read_inputtype  ? "inputtype": "acctype";
         std::string load_operation = accumulate ? "accumulate" : "overwrite";
              instr_name            = "load" + std::to_string(load_num) + "_acc_" + inputtype + "_" + load_operation;
     }else{
@@ -127,14 +127,14 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     // Decode instruction
     if(is_acc_addr){
         load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)) &
-                        (load_statevars.acc_type == BoolConst(acctype_inputs)) &
+                        (load_statevars.read_inputType == BoolConst(read_inputtype)) &
                         (Extract(command.rs2, 30, 30) == BvConst(accumulate,1))); 
     }else{
         load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)));
     }
 
     // Compute src element size
-    int  src_elmt_size    = acctype_inputs ? ACC_TYPE_WIDTH_BYTES : INPUT_TYPE_WIDTH_BYTES;
+    int  src_elmt_size    = read_inputtype ? INPUT_TYPE_WIDTH_BYTES : ACC_TYPE_WIDTH_BYTES;
     auto src_elmt_size_bv = BvConst(src_elmt_size, 64);
 
 
@@ -157,14 +157,14 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     auto dest_col = spad_col + load_statevars.cur_pixel.ZExt(16) * num_cols;
 
     // Calculate values to help load data from soc mem
-    bool cast_to_acctype   = is_acc_addr && !acctype_inputs;
+    bool cast_to_acctype   = is_acc_addr && read_inputtype;
     int  zero_pad_per_elmt = ACC_TYPE_WIDTH_BITS - INPUT_TYPE_WIDTH_BITS;
     
     // Load src element
     auto src_elmt = LoadMulti(memory.soc_mem, soc_mem_addr, src_elmt_size);
 
     // Mvin scaling 
-    if(!acctype_inputs){
+    if(read_inputtype){
         src_elmt = ScaleInputType(src_elmt, load_statevars.scale);
     }
 

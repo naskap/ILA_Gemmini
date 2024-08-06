@@ -196,14 +196,18 @@ static acc_scale_t_bits acc_scale_t_to_acc_scale_t_bits(acc_scale_t x) {
 #define ROCC_INSTRUCTION_RS1_RS2(x, rs1, rs2, funct) \
   ROCC_INSTRUCTION_0_R_R(x, rs1, rs2, funct)
 
+#define mvin_src_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && g.Gemmini_load0_read_inputType == 0) ? 4 : 1)
+
 // mvin and mvout
 #define gemmini_extended_mvin(dram_addr, spad_addr, cols, rows) \
   for(int row=0;row < rows; row++){                     \
     for(int col=0; col < cols; col++){  \
-      int8_t *address_ptr = ((int8_t *) dram_addr) + row * cols + col;                  \
+      int8_t *address_ptr = ((int8_t *) dram_addr) + row * g.Gemmini_load0_src_stride.to_int() + col * mvin_src_elmt_size_bytes(spad_addr);                  \
       sc_biguint<64> address = (uint64_t) address_ptr;   \
-      sc_biguint<8> data = *address_ptr;                           \
-      g.Gemmini_soc_mem[address] = data;\
+      for(int i = 0; i < mvin_src_elmt_size_bytes(spad_addr); i++){\
+        sc_biguint<8> data = *(address_ptr + i);                           \
+        g.Gemmini_soc_mem[address] = data; \
+      }                                             \
     }                                                   \
   }                                                     \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN)
@@ -220,14 +224,18 @@ static acc_scale_t_bits acc_scale_t_to_acc_scale_t_bits(acc_scale_t x) {
 #define gemmini_mvin(dram_addr, spad_addr) \
   gemmini_extended_mvin(dram_addr, spad_addr, DIM, DIM)
 
+#define mvout_dest_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && (spad_addr >> 29) & 1) ? 4 : 1)
+
 #define gemmini_extended_mvout(dram_addr, spad_addr, cols, rows) \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (uint64_t)(spad_addr), k_MVOUT)\
   for(int row=0;row < rows; row++){                     \
     for(int col=0; col < cols; col++){  \
-      int8_t *address_ptr = ((int8_t *) dram_addr) + row * cols + col;                  \
+      int8_t *address_ptr = ((int8_t *) dram_addr) + row * g.Gemmini_load0_src_stride.to_int() + col * mvout_dest_elmt_size_bytes(spad_addr);                  \
       sc_biguint<64> address = (uint64_t) address_ptr;   \
-      sc_bigint<8> data = g.Gemmini_soc_mem[address] ;   \
-      *address_ptr = data.to_int();                     \
+      for(int i = 0; i < mvout_dest_elmt_size_bytes(spad_addr); i++){\
+        sc_bigint<8> data = g.Gemmini_soc_mem[address + i] ;   \
+        *(address_ptr + i) = data.to_int();                     \
+      }                                                 \
     }                                                   \
   }                                                     \
 
