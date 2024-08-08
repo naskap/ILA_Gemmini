@@ -161,7 +161,8 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     int  zero_pad_per_elmt = ACC_TYPE_WIDTH_BITS - INPUT_TYPE_WIDTH_BITS;
     
     // Load src element
-    auto src_elmt = LoadMulti(memory.soc_mem, soc_mem_addr, src_elmt_size);
+    auto src_elmt = Ite(soc_mem_addr == 0, BvConst(0, src_elmt_size * 8),
+                        LoadMulti(memory.soc_mem, soc_mem_addr, src_elmt_size));
 
     // Mvin scaling 
     if(read_inputtype){
