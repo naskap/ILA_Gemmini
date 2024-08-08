@@ -2,7 +2,9 @@
 cmake_minimum_required(VERSION 3.14.0)
 project(Gemmini LANGUAGES CXX)
 
-option(ILATOR_VERBOSE "Enable instruction sequence logging" OFF)
+option(ILATOR_VERBOSE "Enable instruction sequence logging" ON)
+add_compile_definitions(ILATOR_VERBOSE=1)
+
 option(JSON_SUPPORT "Build JSON parser support" OFF)
 
 find_package(SystemCLanguage CONFIG REQUIRED)
