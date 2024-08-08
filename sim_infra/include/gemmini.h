@@ -198,21 +198,26 @@ static acc_scale_t_bits acc_scale_t_to_acc_scale_t_bits(acc_scale_t x) {
 
 #define mvin_src_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && g.Gemmini_load0_read_inputType == 0) ? 4 : 1)
 
+void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows){
+  if(dram_addr == NULL)
+    return;
+  
+  for(int row=0;row < rows; row++){ 
+    for(int col=0; col < cols; col++){ 
+      int8_t *elmt_address = ((int8_t *) dram_addr) + row * g.Gemmini_load0_src_stride.to_int() + col * mvin_src_elmt_size_bytes(spad_addr);
+      for(int i = 0; i < mvin_src_elmt_size_bytes(spad_addr); i++){
+        int8_t *byte_address = elmt_address + i;
+        sc_biguint<8> data = *(byte_address);
+        sc_biguint<64> byte_address_sc = (uint64_t) byte_address;
+        g.Gemmini_soc_mem[byte_address_sc] = data;
+      }
+    }
+  }
+}
+
 // mvin and mvout
 #define gemmini_extended_mvin(dram_addr, spad_addr, cols, rows) \
-  {                                            \
-    for(int row=0;row < rows; row++){                     \
-      for(int col=0; col < cols; col++){  \
-        int8_t *elmt_address = ((int8_t *) dram_addr) + row * g.Gemmini_load0_src_stride.to_int() + col * mvin_src_elmt_size_bytes(spad_addr);                  \
-        for(int i = 0; i < mvin_src_elmt_size_bytes(spad_addr); i++){\
-          int8_t *byte_address = elmt_address + i;            \
-          sc_biguint<8> data = *(byte_address);                           \
-          sc_biguint<64> byte_address_sc = (uint64_t) byte_address;   \
-          g.Gemmini_soc_mem[byte_address_sc] = data; \
-        }                                             \
-      }                                                   \
-    }                                                     \
-  }                                                   \
+  move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows); \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN)
 
 #define gemmini_extended_mvin2(dram_addr, spad_addr, cols, rows) \
@@ -229,18 +234,22 @@ static acc_scale_t_bits acc_scale_t_to_acc_scale_t_bits(acc_scale_t x) {
 
 #define mvout_dest_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && (spad_addr >> 29) & 1) ? 4 : 1)
 
+void move_from_gemmini_soc_mem_to_cur_proc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows){
+  for(int row=0;row < rows; row++){                     
+    for(int col=0; col < cols; col++){  
+      int8_t *address_ptr = ((int8_t *) dram_addr) + row * g.Gemmini_store_stride.to_int() + col * mvout_dest_elmt_size_bytes(spad_addr);   
+      sc_biguint<64> address = (uint64_t) address_ptr;   
+      for(int i = 0; i < mvout_dest_elmt_size_bytes(spad_addr); i++){
+        sc_bigint<8> data = g.Gemmini_soc_mem[address + i];   
+        *(address_ptr + i) = data.to_int();                     
+      }                                                 
+    }                                                   
+  }                                                    
+}
+
 #define gemmini_extended_mvout(dram_addr, spad_addr, cols, rows) \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (uint64_t)(spad_addr), k_MVOUT)\
-  for(int row=0;row < rows; row++){                     \
-    for(int col=0; col < cols; col++){  \
-      int8_t *address_ptr = ((int8_t *) dram_addr) + row * g.Gemmini_store_stride.to_int() + col * mvout_dest_elmt_size_bytes(spad_addr);                  \
-      sc_biguint<64> address = (uint64_t) address_ptr;   \
-      for(int i = 0; i < mvout_dest_elmt_size_bytes(spad_addr); i++){\
-        sc_bigint<8> data = g.Gemmini_soc_mem[address + i];   \
-        *(address_ptr + i) = data.to_int();                     \
-      }                                                 \
-    }                                                   \
-  }                                                     \
+  move_from_gemmini_soc_mem_to_cur_proc_mem(dram_addr, spad_addr, cols, rows);  \
 
 #define gemmini_mvout(dram_addr, spad_addr) \
   gemmini_extended_mvout(dram_addr, spad_addr, DIM, DIM)
