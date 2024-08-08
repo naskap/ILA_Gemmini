@@ -101,10 +101,9 @@ extern ExprRef StoreMulti(ExprRef &memory, ExprRef &to_store, ExprRef &start_add
     auto data_width  = memory.data_width();
     int addresses_to_store = (to_store.bit_width() / data_width);
     
-    for(int up_counter = 0; up_counter < addresses_to_store; up_counter++){
-        int down_counter = addresses_to_store - up_counter - 1;
-        memory_next = Store(memory_next, start_addr + BvConst(up_counter, start_addr.bit_width()), 
-                            Extract(to_store, data_width*(down_counter+1) - 1, data_width*down_counter));
+    for(int i = 0; i < addresses_to_store; i++){
+        memory_next = Store(memory_next, start_addr + BvConst(i, start_addr.bit_width()), 
+                            Extract(to_store, data_width*(i+1) - 1, data_width*i));
     }
     return memory_next;
 }
