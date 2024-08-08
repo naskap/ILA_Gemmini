@@ -45,6 +45,7 @@ run_test() {
 
     local return_value=$?
     echo "Return value of $test_case: $return_value"
+    return $return_value
 }
 
 

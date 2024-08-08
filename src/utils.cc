@@ -4,7 +4,6 @@ namespace ilang {
 
 namespace Gemmini {
 
-
 extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length){
 
     // Shift to get rid of low bits
@@ -80,51 +79,56 @@ extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars,
     return iterate_next;
 }
 
-
+// Assumes soc_mem is little endian and we want to store our bitvector 
+//       with the most significant bits being at the highest addresses
 extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int num_addrs){
-        // Load the first byte of data
+    // Load the first byte of data
     auto src_elmt = Load(memory, addr);
 
-    // Load the rest of the bytes
+    // Load the rest of the bytes 
     for(int i = 1; i < num_addrs; i++){
-        src_elmt = Concat(src_elmt, Load(memory, addr+i));
+        src_elmt = Concat(Load(memory, addr+i), src_elmt);
         
     }
     return src_elmt;
 
 }
 
+// Assumes soc_mem is little endian and we want to store our bitvector 
+//       with the most significant bits being at the highest addresses
 extern ExprRef StoreMulti(ExprRef &memory, ExprRef &to_store, ExprRef &start_addr){
     auto memory_next = memory;
     auto data_width  = memory.data_width();
-    for(int i = 0; i < (to_store.bit_width() / data_width); i++){
-        memory_next = Store(memory_next, start_addr + BvConst(i, start_addr.bit_width()), 
-                            Extract(to_store, data_width*(i+1) - 1, data_width*i));
+    int addresses_to_store = (to_store.bit_width() / data_width);
+    
+    for(int up_counter = 0; up_counter < addresses_to_store; up_counter++){
+        int down_counter = addresses_to_store - up_counter - 1;
+        memory_next = Store(memory_next, start_addr + BvConst(up_counter, start_addr.bit_width()), 
+                            Extract(to_store, data_width*(down_counter+1) - 1, data_width*down_counter));
     }
     return memory_next;
 }
 
 ExprRef _clamp(ExprRef &to_clamp, ExprRef lo, ExprRef hi){
-    return Ite(to_clamp > hi, hi,
-           Ite(to_clamp < lo, lo, to_clamp));
+    return Ite(Sgt(to_clamp, hi), hi,
+           Ite(Slt(to_clamp, lo), lo, to_clamp));
 }
 
 // Note: Assumes signed types
 extern ExprRef CastAccTypeToInputType(ExprRef &accTypeElmt){
     
     // Clamp element to inputtype range
-    auto input_type_max = BvConst(1 << (INPUT_TYPE_WIDTH_BITS -1) - 1, ACC_TYPE_WIDTH_BITS);
-    auto input_type_min = BvConst(1 << (INPUT_TYPE_WIDTH_BITS -1), ACC_TYPE_WIDTH_BITS);
+    auto input_type_max = BvConst((1 << (INPUT_TYPE_WIDTH_BITS -1))- 1, ACC_TYPE_WIDTH_BITS);
+    auto input_type_min = BvConst(- 1 << (INPUT_TYPE_WIDTH_BITS -1), ACC_TYPE_WIDTH_BITS);
     auto elmt_clamped   = _clamp(accTypeElmt, input_type_min, input_type_max);
     
     auto elmt_casted = Extract(elmt_clamped, INPUT_TYPE_WIDTH_BITS - 1, 0);
     return elmt_casted;
 
 }
-
 extern ExprRef ReLUCast(ExprRef &accTypeElmt){
     
-    auto input_type_max = BvConst(1 << (INPUT_TYPE_WIDTH_BITS -1) - 1, ACC_TYPE_WIDTH_BITS);
+    auto input_type_max = BvConst((1 << (INPUT_TYPE_WIDTH_BITS -1)) - 1, ACC_TYPE_WIDTH_BITS);
     auto clamped_elmt   = _clamp(accTypeElmt, BvConst(0, ACC_TYPE_WIDTH_BITS), input_type_max);
     
     auto elmt_casted = Extract(clamped_elmt, INPUT_TYPE_WIDTH_BITS - 1, 0);
