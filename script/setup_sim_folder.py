@@ -32,6 +32,14 @@ if __name__ == "__main__":
     sim_build_folder = os.path.join(sim_folder, "build")
     os.makedirs(sim_build_folder, exist_ok=True)
     os.chdir(sim_build_folder)
+
+    # Run cmake
     process = os.popen("cmake ..")
     print(process.read())
     process.close()
+
+    # Run select tests
+    os.chdir("..")
+    with os.popen("./test_runner.sh --quiet select") as process:
+        for line in process:
+            print(line, end='')  # Print line (may not be immediate)

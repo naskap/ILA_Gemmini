@@ -14,7 +14,9 @@ for file in "../app"/*; do
     test_cases+=("${test_name}")
 done
 
-
+select=("aligned" "mvin_mvout_acc_full_stride" "mvin_mvout_acc_full" 
+        "mvin_mvout_acc" "mvin_mvout_acc_zero_stride" "mvin_mvout_block_stride"  
+        "mvin_mvout_stride" "mvin_mvout" "mvin_mvout_zeros" "mvin_scale")
 
 # Function to display help message
 print_help() {
@@ -36,10 +38,10 @@ run_test() {
     echo "Running $test_case..."
     
     if [ "$quiet" = true ]; then
-        make Gemmini_test_$test_case > /dev/null 2>&1
+        make Gemmini_test_$test_case -j > /dev/null 2>&1
         ./Gemmini_test_$test_case > /dev/null 2>&1
     else
-        make Gemmini_test_$test_case
+        make Gemmini_test_$test_case -j
         ./Gemmini_test_$test_case
     fi
 
@@ -64,6 +66,18 @@ while [[ $# -gt 0 ]]; do
             total_tests=${#test_cases[@]}
             successful_tests=0
             for test_case in "${test_cases[@]}"; do
+                run_test "$test_case" "$quiet"
+                if [[ $? -eq 0 ]]; then
+                    ((successful_tests++))
+                fi
+            done
+            echo "Results: $successful_tests/$total_tests passing"
+            exit 0
+            ;;
+        select)
+            total_tests=${#select[@]}
+            successful_tests=0
+            for test_case in "${select[@]}"; do
                 run_test "$test_case" "$quiet"
                 if [[ $? -eq 0 ]]; then
                     ((successful_tests++))
