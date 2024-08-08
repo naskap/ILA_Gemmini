@@ -50,6 +50,7 @@ SC_MODULE(Testbench){{
 }};
 
 int sc_main(int argc, char* argv[]) {{
+  assert(__BYTE_ORDER == __LITTLE_ENDIAN);
   Testbench h("h");
   sc_start(10000,SC_SEC);
   return h.status.read(); 

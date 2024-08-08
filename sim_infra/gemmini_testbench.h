@@ -31,6 +31,7 @@ enum test_status {SUCCESS, FAIL, UNFINISHED};
 
 #include <systemc.h>
 #include <include/gemmini_testutils.h>
+#include <endian.h>
 
 
 #endif
