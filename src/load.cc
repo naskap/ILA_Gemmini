@@ -110,19 +110,8 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
         accumulate     = false;
     }
 
-    // Compute instruction name
-    std:: string instr_name;
-    if(is_acc_addr){
-        std::string inputtype      = read_inputtype  ? "inputtype": "acctype";
-        std::string load_operation = accumulate ? "accumulate" : "overwrite";
-             instr_name            = "load" + std::to_string(load_num) + "_acc_" + inputtype + "_" + load_operation;
-    }else{
-        instr_name = "load" + std::to_string(load_num) + "_spad";
-    }
-    ILA_INFO << instr_name;
-
     // Declare instruction
-    auto load_elem = child.NewInstr(instr_name);
+    auto load_elem = child.NewInstr(_BuildInstrName(load_num, is_acc_addr, read_inputtype, accumulate));
 
     // Decode instruction
     if(is_acc_addr){
@@ -132,58 +121,89 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
     }else{
         load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)));
     }
-
-    // Compute src element size
-    int  src_elmt_size    = read_inputtype ? INPUT_TYPE_WIDTH_BYTES : ACC_TYPE_WIDTH_BYTES;
-    auto src_elmt_size_bv = BvConst(src_elmt_size, 64);
-
-
-    // Compute soc mem address (aka src address) for current row
-    auto soc_mem_offset = ZExt(load_statevars.cur_row, 64)
-                        * load_statevars.src_stride 
-                        + src_elmt_size_bv * ZExt(load_statevars.cur_col, 64);
-    auto soc_mem_addr = command.rs1 + soc_mem_offset;
     
-    // Compute spad row and column address
-    auto base_row_address = ZExt(Extract(command.rs2, 28, 0), 32);
-    auto block            = load_statevars.cur_col / BvConst(ARRAY_DIM,16);
-    auto spad_col         = load_statevars.cur_col - block * BvConst(ARRAY_DIM, 16);                                                       // Equiv to cur_col % ARRAY_DIM
-    auto spad_row         = base_row_address + ZExt(load_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(load_statevars.dest_stride, 32);
-    
-    // Compute destination row and column address
+    // Extract command args
     auto num_rows = Extract(command.rs2,63,48);
     auto num_cols = Extract(command.rs2,47,32);
-    auto dest_row = spad_row - ZExt(load_statevars.cur_pixel, 32);
-    auto dest_col = spad_col + load_statevars.cur_pixel.ZExt(16) * num_cols;
+    auto soc_mem_base_address = command.rs1;
+    auto spad_base_addr = Extract(command.rs2, 28, 0);
 
-    // Calculate values to help load data from soc mem
-    bool cast_to_acctype   = is_acc_addr && read_inputtype;
-    int  zero_pad_per_elmt = ACC_TYPE_WIDTH_BITS - INPUT_TYPE_WIDTH_BITS;
-    
-    // Load src element
-    auto src_elmt = Ite(soc_mem_addr == 0, BvConst(0, src_elmt_size * 8),
-                        LoadMulti(memory.soc_mem, soc_mem_addr, src_elmt_size));
+    // Load soc mem (src) elmt
+    auto src_elmt = _GetSrcElmt(memory.soc_mem, soc_mem_base_address, load_statevars, read_inputtype);
 
-    // Mvin scaling 
+    // Scale and cast src elmt
     if(read_inputtype){
         src_elmt = ScaleInputType(src_elmt, load_statevars.scale);
     }
-
-    // Cast to acctype
-    if(cast_to_acctype){
+    if(is_acc_addr && read_inputtype){
         src_elmt = SExt(src_elmt, ACC_TYPE_WIDTH_BITS);
     }
 
-    // Compute row to store
+    // Store src_elmt into spad/accumulator
+    _StoreSrcElmt(load_elem, memory, load_statevars,
+                spad_base_addr, num_cols, src_elmt, 
+                is_acc_addr, read_inputtype, accumulate);
+
+    
+    // Iterate loop variables
+    std::vector<ExprRef> iteration_vars = {load_statevars.cur_row, load_statevars.cur_col, load_statevars.cur_pixel};
+    std::vector<ExprRef> iteration_maxs = {num_rows, num_cols, load_statevars.pixels_per_row};
+    auto last_pixel                     = IterateLoopVars(load_elem, iteration_vars, iteration_maxs);
+    load_elem.SetUpdate(load_statevars.child_valid, !(last_pixel));
+}
+
+std::string _BuildInstrName(int load_num, bool is_acc_addr, bool read_inputtype, bool accumulate){
+    std::string instr_name;
+    if(is_acc_addr){
+        std::string inputtype      = read_inputtype  ? "inputtype": "acctype";
+        std::string load_operation = accumulate ? "accumulate" : "overwrite";
+             instr_name            = "load" + std::to_string(load_num) + "_acc_" + inputtype + "_" + load_operation;
+    }else{
+        instr_name = "load" + std::to_string(load_num) + "_spad";
+    }
+    ILA_INFO << instr_name;
+    return instr_name;
+}
+
+ExprRef _GetSrcElmt(ExprRef soc_mem, ExprRef soc_mem_base_address,load_statevars_t &load_statevars, bool read_inputtype){
+    int  src_elmt_size    = read_inputtype ? INPUT_TYPE_WIDTH_BYTES : ACC_TYPE_WIDTH_BYTES;
+    auto soc_mem_offset = ZExt(load_statevars.cur_row, 64)
+                        * load_statevars.src_stride 
+                        + BvConst(src_elmt_size, 64) * ZExt(load_statevars.cur_col, 64);
+    auto soc_mem_addr = soc_mem_base_address + soc_mem_offset;
+    auto src_elmt = Ite(soc_mem_addr == 0, BvConst(0, src_elmt_size * 8),
+                        LoadMulti(soc_mem, soc_mem_addr, src_elmt_size));
+    return src_elmt;
+}
+
+void _StoreSrcElmt(InstrRef &load_elem, 
+                   gemmini_memory_t memory, 
+                   load_statevars_t load_statevars,
+                   ExprRef &spad_base_addr,
+                   ExprRef &num_cols,
+                   ExprRef &src_elmt,
+                   bool is_acc_addr, bool read_inputtype, 
+                   bool accumulate){
+
+    // Compute dest row and col
+    auto block            = load_statevars.cur_col / BvConst(ARRAY_DIM,16);
+    auto spad_col         = load_statevars.cur_col - block * BvConst(ARRAY_DIM, 16); // represents base row/col of diagonal load                                                    // Equiv to cur_col % ARRAY_DIM
+    auto spad_row         = spad_base_addr.ZExt(32) + ZExt(load_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(load_statevars.dest_stride, 32);
+    auto dest_row = spad_row - ZExt(load_statevars.cur_pixel, 32);
+    auto dest_col = spad_col + load_statevars.cur_pixel.ZExt(16) * num_cols;
+    
+    // Load the row of data we want to modify
     ExprRef dest_row_data = (ExprRef) NULL;
     if(is_acc_addr){
         dest_row_data = Load(memory.accumulator, dest_row);
     }else{
         dest_row_data = Load(memory.spad, dest_row);
     }
-    ExprRef row_to_store   = (ExprRef) NULL;
-    auto src_elmt_size_bits = src_elmt_size * 8;
-    auto    dest_slice_idx = BvConst(ARRAY_DIM * src_elmt_size_bits, 16) - dest_col * src_elmt_size_bits - 1;
+
+    // Overwrite or accumulate our src_elmt into that row
+    ExprRef row_to_store       = (ExprRef) NULL;
+    auto    src_elmt_size_bits = read_inputtype ? INPUT_TYPE_WIDTH_BITS : ACC_TYPE_WIDTH_BITS;
+    auto    dest_slice_idx     = BvConst(ARRAY_DIM * src_elmt_size_bits, 16) - dest_col * src_elmt_size_bits - 1;
     if(accumulate){
         row_to_store = AccSlice(dest_row_data, src_elmt, dest_slice_idx);
     }else{
@@ -198,12 +218,6 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
         auto acc_next = Store(memory.accumulator, dest_row, row_to_store);
         load_elem.SetUpdate(memory.accumulator, acc_next);
     }
-    
-    // Iterate loop variables
-    std::vector<ExprRef> iteration_vars = {load_statevars.cur_row, load_statevars.cur_col, load_statevars.cur_pixel};
-    std::vector<ExprRef> iteration_maxs = {num_rows, num_cols, load_statevars.pixels_per_row};
-    auto last_pixel                     = IterateLoopVars(load_elem, iteration_vars, iteration_maxs);
-    load_elem.SetUpdate(load_statevars.child_valid, !(last_pixel));
 }
 
 } // Gemmini
