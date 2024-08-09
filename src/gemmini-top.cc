@@ -28,6 +28,7 @@ Ila GetGemminiIla(const std::string& model_name) {
 
   DefineLoad(m, command, memory);
   DefineStore(m, command, memory);
+  DefineExecute(m, command, memory);
 
   return m;
 }
