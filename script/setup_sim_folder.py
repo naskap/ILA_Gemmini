@@ -1,6 +1,7 @@
 import argparse
 import os
 import shutil
+from gen_cmakelists import gen_cmakelists
 
 if __name__ == "__main__":
 
@@ -25,8 +26,9 @@ if __name__ == "__main__":
                 dst=sim_folder)
     
     # Overwrite default CMakeLists.txt
-    shutil.copy(src=os.path.join(ILA_Gemmini_root,"sim_infra/CMakeLists.txt"),\
-                dst=sim_folder)
+    cmakelists_fpath = os.path.join(sim_folder, "CMakeLists.txt")
+    with open(cmakelists_fpath, "w") as file:
+        file.write(gen_cmakelists(sim_folder))
 
     # Create build folder and run cmake
     sim_build_folder = os.path.join(sim_folder, "build")
