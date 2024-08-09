@@ -1,4 +1,5 @@
-#include <Gemmini/Gemmini.h>
+#include <Gemmini/utils.h>
+#include <Gemmini/gemmini_base.h>
 
 namespace ilang {
 

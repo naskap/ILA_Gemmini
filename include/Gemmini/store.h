@@ -1,6 +1,6 @@
 #ifndef GEMMINI_LOAD_H
 #define GEMMINI_LOAD_H
-#include <Gemmini/Gemmini.h> 
+#include <Gemmini/gemmini_base.h> 
 #include <ilang/ilang++.h>
 
 namespace ilang {

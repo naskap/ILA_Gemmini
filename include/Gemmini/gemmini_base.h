@@ -8,6 +8,7 @@
 #include <malloc.h>
 #include <stdio.h>
 #include <ilang/ilang++.h>
+#include <Gemmini/utils.h>
 
 #define INSTR_FUNCT_WIDTH 7
 #define INSTR_RS2_WIDTH 64
@@ -154,16 +155,6 @@ struct gemmini_memory_t{
 Ila GetGemminiIla(const std::string& model_name = "Gemmini");
 extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory);
 extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory);
-
-extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length);
-extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high);
-extern ExprRef AccSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high);
-extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int addresses);
-extern ExprRef StoreMulti(ExprRef &memory, ExprRef &to_store, ExprRef &start_addr);
-extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max);
-extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_maximums);
-extern ExprRef CastAccTypeToInputType(ExprRef &accTypeElmt);
-extern ExprRef ReLUCast(ExprRef &accTypeElmt);
 
 // Uninterpreted functions
 static auto scale = SortRef::BV(32);

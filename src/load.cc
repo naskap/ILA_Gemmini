@@ -1,4 +1,4 @@
-#include <Gemmini/gemmini_load.h>
+#include <Gemmini/load.h>
 
 namespace ilang {
 

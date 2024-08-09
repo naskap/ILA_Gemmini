@@ -1,6 +1,6 @@
 // File: Gemmini.cc
 
-#include <Gemmini/Gemmini.h>
+#include <Gemmini/gemmini_base.h>
 
 
 namespace ilang {

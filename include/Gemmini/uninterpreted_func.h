@@ -33,27 +33,6 @@
 namespace ilang {
 namespace Gemmini {
 
-static auto mul_in = SortRef::BV(WEIGHT_TOTAL_BITWIDTH);
-static auto mul_out = SortRef::BV(PSUM_TOTAL_BITWIDTH);
-static auto psum_type = SortRef::BV(PSUM_TOTAL_BITWIDTH);
-static auto act_type = SortRef::BV(ACT_TOTAL_BITWIDTH);
-
-static std::vector<SortRef> ConvMac_in = {psum_type, mul_in, mul_in};
-
-
-
-
-static FuncRef ConvMac("ConvMac", psum_type, ConvMac_in);
-static FuncRef ConvMacPsum2Act("ConvMacPsum2Act", act_type, psum_type);
-
-static auto act_psum_type = SortRef::BV(ACT_TOTAL_BITWIDTH);
-
-
-static FuncRef ActAdd2Psum("ActAdd2Psum", psum_type, act_type, act_type);
-static FuncRef ConvAddBias("ConvAddBias", psum_type, psum_type, act_type);
-
-static FuncRef Psum2Act("Psum2Act", act_psum_type, psum_type);
-static FuncRef PsumRelu("PsumRelu", psum_type, psum_type);
 
 } // namespace ilang
 } // namespace gemmini

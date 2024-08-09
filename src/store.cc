@@ -1,5 +1,5 @@
 
-#include <Gemmini/gemmini_store.h>
+#include <Gemmini/store.h>
 
 namespace ilang {
 
