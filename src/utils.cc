@@ -5,7 +5,10 @@ namespace ilang {
 
 namespace Gemmini {
 
-extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length){
+
+
+
+ExprRef GetBvSlice(ExprRef const &src, ExprRef const &idx_hi, int length){
 
     // Shift to get rid of low bits
     ExprRef idx_lo = idx_hi - BvConst(length -1,idx_hi.bit_width());
@@ -15,8 +18,17 @@ extern ExprRef GetSlice(ExprRef &src, ExprRef idx_hi, int length){
     return Extract(slice, length - 1, 0);
 }
 
-// Could also implement this by 1) masking out slice range 2) bitwise or with slice
-extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high){
+ExprRef GetBvElmt(ExprRef const &src_bv, ExprRef const &idx, int elmt_size){
+    ILA_ASSERT(src_bv.bit_width() % elmt_size == 0);
+    auto slice_idx_hi = BvConst(src_bv.bit_width(), idx.bit_width()) - idx * elmt_size - 1;
+    return GetBvSlice(src_bv, slice_idx_hi, elmt_size);
+}
+
+ExprRef GetMemElmt(ExprRef const &src_mem, ExprRef const &row, ExprRef const &col, int elmt_size){
+    return GetBvElmt(src_mem.Load(row), col, elmt_size);
+}
+
+ExprRef SetBvSlice(ExprRef const &dest_bv, ExprRef const &start_index_high, ExprRef const &src_bv){
     
     ExprRef start_index_low = start_index_high - BvConst(src_bv.bit_width() - 1, start_index_high.bit_width());
 
@@ -32,14 +44,13 @@ extern ExprRef SetSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_hi
     
 }
 
-extern ExprRef AccSlice(ExprRef &dest_bv, ExprRef src_bv, ExprRef start_index_high){
-    
-    // Compute slice to store
-    auto dest_slice = GetSlice(dest_bv, start_index_high, src_bv.bit_width());
-    auto to_store   = dest_slice + src_bv;
-
-    return SetSlice(dest_bv, to_store, start_index_high);
-    
+ExprRef SetBvElmt(ExprRef const &dest_bv, ExprRef const &idx, ExprRef const &src_bv){
+    ILA_ASSERT(dest_bv.bit_width() % src_bv.bit_width() == 0);
+    auto slice_idx_hi = BvConst(dest_bv.bit_width(), idx.bit_width()) - idx * src_bv.bit_width() - 1;
+    return SetBvSlice(dest_bv, slice_idx_hi, src_bv);
+}
+ExprRef SetMemElmt(ExprRef const &dest_mem, ExprRef const &row, ExprRef const &col, ExprRef const &src_bv){
+    return SetBvElmt(dest_mem.Load(row), col, src_bv);
 }
 
 extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max){

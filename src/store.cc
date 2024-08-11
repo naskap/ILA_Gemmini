@@ -142,38 +142,24 @@ void DefineStoreChildInstruction(Ila& child,
     if(maxpool){
         maxpool_params_t maxp_params = store_statevars.maxpool_params;
         
-        
+        // Compute cur elmt indices
         auto channels = num_cols;
         auto orow     = store_statevars.cur_row.ZExt(32) * maxp_params.enable_and_stride.ZExt(32) + store_statevars.cur_wrow.ZExt(32) - maxp_params.upper_pad.ZExt(32);
         auto ocol     = store_statevars.cur_col.ZExt(32) * maxp_params.enable_and_stride.ZExt(32) + store_statevars.cur_wcol.ZExt(32) - maxp_params.left_pad.ZExt(32);
         auto row_addr = src_base_address.ZExt(32) + orow* maxp_params.out_cols.ZExt(32) + ocol;
 
-        // Note: spike simulation doesn't honor address bit 29 for maxpool
-        int elem_size = from_accumulator ? ACC_TYPE_WIDTH_BITS : INPUT_TYPE_WIDTH_BITS;
-        
-        
-        int     row_size       = elem_size * ARRAY_DIM;
-        ExprRef elem           = (ExprRef) BvConst(0, elem_size);
-        ExprRef elem_offset_hi = BvConst(row_size, 16) - store_statevars.cur_ch * BvConst(elem_size, 16);
-        
-        // Check if element is a pad
-        ExprRef cond_out_of_bounds = orow < BvConst(0,orow.bit_width()) | ocol < BvConst(0,ocol.bit_width()) | orow >= maxp_params.out_rows.ZExt(32) | ocol >= maxp_params.out_cols.ZExt(32);
+        // Compute whether cur element is in bounds
+        auto cond_out_of_bounds = orow < BvConst(0,orow.bit_width()) | ocol < BvConst(0,ocol.bit_width()) | orow >= maxp_params.out_rows.ZExt(32) | ocol >= maxp_params.out_cols.ZExt(32);
 
-        // Handle accumulator case
+        // Compute cur element
+        int  elem_size = from_accumulator ? ACC_TYPE_WIDTH_BITS : INPUT_TYPE_WIDTH_BITS;
+        auto elem           = BvConst(0, elem_size);
         if(from_accumulator){
-            auto acc_row   = Load(memory.accumulator,row_addr);
-            auto acc_value = GetSlice(acc_row, elem_offset_hi, elem_size);
-            if(acctype){
-
-            }else{
-
-            }
+            auto acc_value = GetMemElmt(memory.accumulator, row_addr, store_statevars.cur_ch, elem_size);
             auto acc_value_scaled = ScaleAccType(acc_value, store_statevars.accScale);
                  elem             = Ite((!cond_out_of_bounds), acc_value_scaled, elem);
         }else{
-            // Handle spad case
-            auto spad_row   = Load(memory.spad, row_addr);
-            auto spad_value = GetSlice(spad_row, elem_offset_hi, elem_size);
+            auto spad_value = GetMemElmt(memory.spad, row_addr, store_statevars.cur_ch, elem_size);
                  elem       = Ite((!cond_out_of_bounds), spad_value, elem);
         }
 
@@ -213,12 +199,10 @@ void DefineStoreChildInstruction(Ila& child,
         auto block             = store_statevars.cur_col / array_dim_bv;
         auto spad_col          = store_statevars.cur_col - block * array_dim_bv;                                                            // Equiv to cur_col % ARRAY_DIM
         auto spad_row          = src_base_address.ZExt(32) + ZExt(store_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(array_dim_bv, 32);
-        auto slice_idx_hi      = array_dim_bv * load_elmt_size_bv - spad_col * load_elmt_size_bv - 1;
     
         // Load data
         auto src_mem  = from_accumulator ?  memory.accumulator : memory.spad;
-        auto src_row  = Load(src_mem, spad_row);
-        auto src_elmt = GetSlice(src_row, slice_idx_hi, load_elmt_size);
+        auto src_elmt = GetMemElmt(src_mem, spad_row, spad_col, load_elmt_size);
 
         if(from_accumulator && !acctype){
             

@@ -192,32 +192,17 @@ void _StoreSrcElmt(InstrRef &load_elem,
     auto dest_row = spad_row - ZExt(load_statevars.cur_pixel, 32);
     auto dest_col = spad_col + load_statevars.cur_pixel.ZExt(16) * num_cols;
     
-    // Load the row of data we want to modify
-    ExprRef dest_row_data = (ExprRef) NULL;
-    if(is_acc_addr){
-        dest_row_data = Load(memory.accumulator, dest_row);
+    // Store/accumulate
+    auto dest_mem = is_acc_addr ? memory.accumulator : memory.spad;
+    if(accumulate){
+        auto cur_elmt = GetMemElmt(dest_mem, dest_row, dest_col, ACC_TYPE_WIDTH_BITS);
+        auto dest_mem_next = SetMemElmt(dest_mem, dest_row, dest_col, cur_elmt + src_elmt);
+        load_elem.SetUpdate(dest_mem, dest_mem_next);
     }else{
-        dest_row_data = Load(memory.spad, dest_row);
+        auto dest_mem_next = SetMemElmt(dest_mem, dest_row, dest_col, src_elmt);
+        load_elem.SetUpdate(dest_mem, dest_mem_next);
     }
 
-    // Overwrite or accumulate our src_elmt into that row
-    ExprRef row_to_store       = (ExprRef) NULL;
-    auto    src_elmt_size_bits = read_inputtype ? INPUT_TYPE_WIDTH_BITS : ACC_TYPE_WIDTH_BITS;
-    auto    dest_slice_idx     = BvConst(ARRAY_DIM * src_elmt_size_bits, 16) - dest_col * src_elmt_size_bits - 1;
-    if(accumulate){
-        row_to_store = AccSlice(dest_row_data, src_elmt, dest_slice_idx);
-    }else{
-        row_to_store = SetSlice(dest_row_data, src_elmt, dest_slice_idx);
-    }
-    
-    // Store the row of data in spad or acc
-    if(!is_acc_addr){
-        auto spad_next = Store(memory.spad, dest_row, row_to_store);
-        load_elem.SetUpdate(memory.spad, spad_next); 
-    } else{
-        auto acc_next = Store(memory.accumulator, dest_row, row_to_store);
-        load_elem.SetUpdate(memory.accumulator, acc_next);
-    }
 }
 
 } // Gemmini
