@@ -13,10 +13,6 @@
 #define INSTR_FUNCT_WIDTH 7
 #define INSTR_RS2_WIDTH 64
 #define INSTR_RS1_WIDTH 64
-// #define INSTR_XD_WIDTH 1
-// #define INSTR_XS1_WIDTH 1
-// #define INSTR_XS2_WIDTH 1
-// #define INSTR_RD_WIDTH 5
 #define INSTR_OPCODE_WIDTH 7
 
 #define INPUT_TYPE_WIDTH_BITS 8 // inputType is int8 by default
@@ -32,17 +28,16 @@
 #define ACC_TYPE_WIDTH_BYTES (ACC_TYPE_WIDTH_BITS / 8)
 #define ACC_ROW_WIDTH (ACC_TYPE_WIDTH_BITS * ARRAY_DIM)
 
-
-
 #define SOC_MEM_ADDRESS_WIDTH 64
 #define SOC_MEM_ELEMENT_BITS 8
 
+// Gemmini CMDs (funct field values)
 #define CONFIG_CMD 0
 #define LOAD2_CMD 1
 #define LOAD_CMD 2
 #define STORE_CMD 3
-#define COMPUTE_AND_FLIP_CMD 4
-#define COMPUTE_AND_STAY_CMD 5
+#define COMPUTE_PRELOADED_CMD 4
+#define COMPUTE_ACCUMULATE_CMD 5
 #define PRELOAD_CMD 6
 #define FLUSH_CMD 7
 #define LOOP_WS 8
@@ -60,22 +55,26 @@
 #define LOOP_CONV_WS_CONFIG_5 20
 #define LOOP_CONV_WS_CONFIG_6 21
 #define CLKGATE_EN 22
+
+// Config types
 #define CONFIG_EX 0
 #define CONFIG_LOAD 1
 #define CONFIG_STORE 2
 #define CONFIG_NORM 3
-#define CISC_CONFIG 10
-#define ADDR_AB 11
-#define ADDR_CD 12
-#define SIZE_MN 13
-#define SIZE_K 14
-#define RPT_BIAS 15
-#define RESET 16
-#define COMPUTE_CISC 17
-#define COUNTER_OP 126
 
 #define SPAD_ENTRIES 1024 * 256
 #define ACC_ENTRIES 1024 * 64
+
+// Macros that might be helpful in the future
+// #define CISC_CONFIG 10
+// #define ADDR_AB 11
+// #define ADDR_CD 12
+// #define SIZE_MN 13
+// #define SIZE_K 14
+// #define RPT_BIAS 15
+// #define RESET 16
+// #define COMPUTE_CISC 17
+// #define COUNTER_OP 126
 // #define GARBAGE_ADDR       "hffffffff"
 // #define MVIN_RS2_ADDR_WIDTH  32
 // #define MVIN_RS2_COLS_WIDTH  16

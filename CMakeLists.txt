@@ -35,6 +35,7 @@ add_executable(${MyTarget}
   src/gemmini-top.cc
   src/load.cc
   src/store.cc
+  src/execute.cc
   src/utils.cc
 )
 
