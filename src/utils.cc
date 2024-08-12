@@ -50,7 +50,8 @@ ExprRef SetBvElmt(ExprRef const &dest_bv, ExprRef const &idx, ExprRef const &src
     return SetBvSlice(dest_bv, slice_idx_hi, src_bv);
 }
 ExprRef SetMemElmt(ExprRef const &dest_mem, ExprRef const &row, ExprRef const &col, ExprRef const &src_bv){
-    return SetBvElmt(dest_mem.Load(row), col, src_bv);
+    auto updated_bv = SetBvElmt(dest_mem.Load(row), col, src_bv);
+    return dest_mem.Store(row, updated_bv);
 }
 
 extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max){
@@ -126,24 +127,32 @@ ExprRef _clamp(ExprRef &to_clamp, ExprRef lo, ExprRef hi){
 }
 
 // Note: Assumes signed types
-extern ExprRef CastAccTypeToInputType(ExprRef &accTypeElmt){
+extern ExprRef CastBv(ExprRef &src, unsigned int out_width){
     
     // Clamp element to inputtype range
-    auto input_type_max = BvConst((1 << (INPUT_TYPE_WIDTH_BITS -1))- 1, ACC_TYPE_WIDTH_BITS);
-    auto input_type_min = BvConst(- 1 << (INPUT_TYPE_WIDTH_BITS -1), ACC_TYPE_WIDTH_BITS);
-    auto elmt_clamped   = _clamp(accTypeElmt, input_type_min, input_type_max);
+    auto input_type_max = BvConst((1 << (out_width -1))- 1, src.bit_width());
+    auto input_type_min = BvConst(- 1 << (out_width -1), src.bit_width());
+    auto elmt_clamped   = _clamp(src, input_type_min, input_type_max);
     
-    auto elmt_casted = Extract(elmt_clamped, INPUT_TYPE_WIDTH_BITS - 1, 0);
+    auto elmt_casted = Extract(elmt_clamped, out_width - 1, 0);
     return elmt_casted;
 
 }
-extern ExprRef ReLUCast(ExprRef &accTypeElmt){
+
+
+extern ExprRef ReLUCast(ExprRef &x, unsigned int out_width){
     
-    auto input_type_max = BvConst((1 << (INPUT_TYPE_WIDTH_BITS -1)) - 1, ACC_TYPE_WIDTH_BITS);
-    auto clamped_elmt   = _clamp(accTypeElmt, BvConst(0, ACC_TYPE_WIDTH_BITS), input_type_max);
+    auto input_type_max = BvConst((1 << (out_width -1)) - 1, x.bit_width());
+    auto clamped_elmt   = _clamp(x, BvConst(0, x.bit_width()), input_type_max);
     
-    auto elmt_casted = Extract(clamped_elmt, INPUT_TYPE_WIDTH_BITS - 1, 0);
+    auto elmt_casted = Extract(clamped_elmt, out_width - 1, 0);
     return elmt_casted;
 }
+
+ExprRef ApplyActivation(ExprRef &x, ExprRef &act, unsigned int out_width){
+    return Ite(act == BvConst(Activation::NONE, 2), CastBv(x, out_width),
+           Ite(act == BvConst(Activation::ReLU, 2), ReLUCast(x, out_width), BvConst(-1, out_width)));
+}
+
 }
 }

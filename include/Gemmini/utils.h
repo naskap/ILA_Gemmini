@@ -16,8 +16,10 @@ extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int addresses);
 extern ExprRef StoreMulti(ExprRef &memory, ExprRef &to_store, ExprRef &start_addr);
 extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max);
 extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_maximums);
-extern ExprRef CastAccTypeToInputType(ExprRef &accTypeElmt);
-extern ExprRef ReLUCast(ExprRef &accTypeElmt);
+
+extern ExprRef ApplyActivation(ExprRef &src, ExprRef &act, unsigned int out_width);
+extern ExprRef CastBv(ExprRef &src, unsigned int out_width);
+extern ExprRef ReLUCast(ExprRef &accTypeElmt, unsigned int out_width);
 
 }
 }

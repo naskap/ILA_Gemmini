@@ -211,8 +211,7 @@ void DefineStoreChildInstruction(Ila& child,
 
             // Apply activation
             // Note only NONE and ReLU are implemented as activation functions
-            src_elmt = Ite(store_statevars.activation == BvConst(Activation::NONE, 2), CastAccTypeToInputType(src_elmt),
-                       Ite(store_statevars.activation == BvConst(Activation::ReLU, 2), ReLUCast(src_elmt), BvConst(0, INPUT_TYPE_WIDTH_BITS)));
+            src_elmt = ApplyActivation(src_elmt, store_statevars.activation, INPUT_TYPE_WIDTH_BITS);
         
         }
 

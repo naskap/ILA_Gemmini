@@ -33,7 +33,6 @@ struct store_statevars_t {
   ExprRef cur_max     = (ExprRef) NULL;
 };
 
-enum Activation {NONE, ReLU};
 
 void DefineStoreStateVars(Ila& m, store_statevars_t& store_statevars);
 void DefineConfigStoreInstruction(Ila& m, command_t command,

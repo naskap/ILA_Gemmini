@@ -28,6 +28,8 @@
 #define ACC_TYPE_WIDTH_BYTES (ACC_TYPE_WIDTH_BITS / 8)
 #define ACC_ROW_WIDTH (ACC_TYPE_WIDTH_BITS * ARRAY_DIM)
 
+#define OUTPUT_TYPE_WIDTH_BITS 16
+
 #define SOC_MEM_ADDRESS_WIDTH 64
 #define SOC_MEM_ELEMENT_BITS 8
 
@@ -149,6 +151,8 @@ struct gemmini_memory_t{
   ExprRef accumulator = (ExprRef) NULL;
   ExprRef soc_mem     = (ExprRef) NULL;
 };
+
+enum Activation {NONE, ReLU};
 
 
 Ila GetGemminiIla(const std::string& model_name = "Gemmini");
