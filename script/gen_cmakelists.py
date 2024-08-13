@@ -3,11 +3,23 @@ import os
 def gen_cmakelists(sim_folder : str):
     assert os.path.exists(sim_folder)
 
-    src_folder = os.path.join(sim_folder, "src")
-    assert os.path.exists(src_folder)
+    with open(os.path.join(sim_folder, "CMakeLists.txt"), "r") as f:
+        cmake_text = f.read()
 
-    src_list = [os.path.join("${CMAKE_CURRENT_SOURCE_DIR}/src", fname) for fname in os.listdir(src_folder)]
-    srcs = "\n".join(src_list)
+    # Find src files with generated cmakelists string manip
+    def get_string_between_keywords(src_string : str, target1 : str, target2 : str) -> str:
+      idx_1 = src_string.find(target1)
+      idx_2 = src_string.find(target2)
+      return src_string[idx_1 + len(target1) + 1 : idx_2]
+        
+    srcs = get_string_between_keywords(cmake_text, "${extern_src}", "\n)\n")
+
+    # Below will assume all files in src file should be included (sometimes errors over repeated runs)
+    # src_folder = os.path.join(sim_folder, "src")
+    # assert os.path.exists(src_folder)
+
+    # src_list = [os.path.join("${CMAKE_CURRENT_SOURCE_DIR}/src", fname) for fname in os.listdir(src_folder)]
+    # srcs = "\n".join(src_list)
 
     return f"""# CMakeLists.txt for Gemmini
 cmake_minimum_required(VERSION 3.14.0)

@@ -27,8 +27,9 @@ if __name__ == "__main__":
     
     # Overwrite default CMakeLists.txt
     cmakelists_fpath = os.path.join(sim_folder, "CMakeLists.txt")
+    new_cmakelists_text = gen_cmakelists(sim_folder)
     with open(cmakelists_fpath, "w") as file:
-        file.write(gen_cmakelists(sim_folder))
+        file.write(new_cmakelists_text)
 
     # Create build folder and run cmake
     sim_build_folder = os.path.join(sim_folder, "build")

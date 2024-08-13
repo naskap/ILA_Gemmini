@@ -217,8 +217,10 @@ void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned i
 
 // mvin and mvout
 #define gemmini_extended_mvin(dram_addr, spad_addr, cols, rows) \
+  { \
   move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows); \
-  ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN)
+  ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN) \
+  } \
 
 #define gemmini_extended_mvin2(dram_addr, spad_addr, cols, rows) \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN2)
@@ -248,8 +250,10 @@ void move_from_gemmini_soc_mem_to_cur_proc_mem(const void *dram_addr, unsigned i
 }
 
 #define gemmini_extended_mvout(dram_addr, spad_addr, cols, rows) \
+  { \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (uint64_t)(spad_addr), k_MVOUT)\
   move_from_gemmini_soc_mem_to_cur_proc_mem(dram_addr, spad_addr, cols, rows);  \
+  } \
 
 #define gemmini_mvout(dram_addr, spad_addr) \
   gemmini_extended_mvout(dram_addr, spad_addr, DIM, DIM)
