@@ -11,11 +11,12 @@
 #endif
 #include "include/gemmini_testutils.h"
 
-void print_matrix(size_t rows, size_t cols, elem_t mat[rows][cols]) {
+void print_matrix(size_t rows, size_t cols, elem_t **mat) {
+    elem_t (*mat_casted)[cols] = reinterpret_cast<elem_t (*)[cols]>(mat);
     for (size_t r = 0; r < rows; r++) {
         for (size_t c = 0; c < cols; c++)
 #ifndef ELEM_T_IS_FLOAT
-            printf("%d ", mat[r][c]);
+            printf("%d ", mat_casted[r][c]);
 #else
             printf("%x ", elem_t_to_elem_t_bits(mat[r][c]));
 #endif
@@ -79,7 +80,7 @@ SC_MODULE(Testbench){
                     printf("Matrices don't match!\n");
 
                     printf("input:\n");
-                    print_matrix(rows, cols, input);
+                    print_matrix(rows, cols, (elem_t **) input);
 
                     printf("output:\n");
                     printMatrix(output);
@@ -118,10 +119,10 @@ SC_MODULE(Testbench){
                     printf("Matrices don't match!\n");
 
                     printf("input:\n");
-                    print_matrix(rows, cols, input);
+                    print_matrix(rows, cols, (elem_t **) input);
 
                     printf("output:\n");
-                    print_matrix(rows, cols, output);
+                    print_matrix(rows, cols, (elem_t **) output);
 
                     status = 1; return;
                 }
@@ -194,10 +195,10 @@ SC_MODULE(Testbench){
                     printf("Matrices don't match! (dataflow == %d)\n", dataflow);
 
                     printf("C:\n");
-                    print_matrix(I, J, C);
+                    print_matrix(I, J, (elem_t **) C);
 
                     printf("gold:\n");
-                    print_matrix(I, J, gold);
+                    print_matrix(I, J, (elem_t **) gold);
 
                     status = 1; return;
                 }

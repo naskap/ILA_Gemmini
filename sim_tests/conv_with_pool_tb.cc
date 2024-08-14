@@ -119,9 +119,9 @@ void conv(int stride, int padding,
     }
 }
 
-void pool(int batch_size, int channels,
-        int in_row_dim, int in_col_dim, int out_row_dim, int out_col_dim,
-        int window_dim, int stride, int padding,
+template <int batch_size, int channels,
+        int in_row_dim, int in_col_dim, int out_row_dim, int out_col_dim>
+void pool(int window_dim, int stride, int padding,
         elem_t input[batch_size][in_row_dim][in_col_dim][channels],
         elem_t output[batch_size][out_row_dim][out_col_dim][channels]) {
 
@@ -280,9 +280,8 @@ SC_MODULE(Testbench){
 
     printf("CPU pool...\n");
     uint64_t start_cpu_pool = read_cycles();
-    pool(BATCH_SIZE, OUT_CHANNELS,
-            OUT_ROW_DIM, OUT_COL_DIM, POOL_OUT_ROW_DIM, POOL_OUT_COL_DIM,
-            POOL_SIZE, POOL_STRIDE, POOL_PADDING,
+    pool<BATCH_SIZE, OUT_CHANNELS,
+            OUT_ROW_DIM, OUT_COL_DIM, POOL_OUT_ROW_DIM, POOL_OUT_COL_DIM>(POOL_SIZE, POOL_STRIDE, POOL_PADDING,
             output,
             pool_output);
     uint64_t end_cpu_pool = read_cycles();
