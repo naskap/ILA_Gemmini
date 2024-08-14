@@ -59,11 +59,11 @@
 #define PATCH_SIZE (KERNEL_DIM * KERNEL_DIM * IN_CHANNELS)
 #define N_PATCHES (BATCH_SIZE * OUT_ROW_DIM * OUT_COL_DIM)
 
-void conv(int batch_size, int in_channels,
+template <int batch_size, int in_channels,
         int in_row_dim, int in_col_dim,
         int out_channels, int kernel_dim,
-        int out_row_dim, int out_col_dim,
-        int stride, int input_dilation, int kernel_dilation, int padding,
+        int out_row_dim, int out_col_dim>
+void conv(int stride, int input_dilation, int kernel_dilation, int padding,
         elem_t input[batch_size][in_row_dim][in_col_dim][in_channels],
         elem_t weights[out_channels][kernel_dim][kernel_dim][in_channels],
         acc_t bias[out_channels],
@@ -155,8 +155,8 @@ void conv(int batch_size, int in_channels,
     }
 }
 
-void flatten_weights(int out_channels, int kernel_dim, int in_channels,
-        int patch_size,
+template <int out_channels, int kernel_dim, int in_channels, int patch_size>
+void flatten_weights(
         elem_t weights[out_channels][kernel_dim][kernel_dim][in_channels],
         elem_t weights_mat[patch_size][out_channels]) {
 
@@ -268,11 +268,11 @@ SC_MODULE(Testbench){
     printf("CPU conv...\n");
     uint64_t start_cpu = read_cycles();
 #ifndef FAST
-    conv(BATCH_SIZE, IN_CHANNELS,
+    conv<BATCH_SIZE, IN_CHANNELS,
             IN_ROW_DIM, IN_COL_DIM,
             OUT_CHANNELS, KERNEL_DIM,
-            OUT_ROW_DIM, OUT_COL_DIM,
-            STRIDE, INPUT_DILATION, KERNEL_DILATION, PADDING,
+            OUT_ROW_DIM, OUT_COL_DIM>(
+            STRIDE,  INPUT_DILATION, KERNEL_DILATION, PADDING,
             input,
             weights,
             bias,
@@ -285,9 +285,7 @@ SC_MODULE(Testbench){
     static elem_t output_mat[N_PATCHES][OUT_CHANNELS];
 
     printf("Flatten weights...\n");
-    flatten_weights(OUT_CHANNELS, KERNEL_DIM, IN_CHANNELS,
-            PATCH_SIZE,
-            weights,
+    flatten_weights<OUT_CHANNELS, KERNEL_DIM, IN_CHANNELS, PATCH_SIZE>(weights,
             weights_mat);
 
     printf("Gemmini conv...\n");
@@ -419,8 +417,9 @@ SC_MODULE(Testbench){
 };
 
 int sc_main(int argc, char* argv[]) {
+  assert(__BYTE_ORDER == __LITTLE_ENDIAN);
   Testbench h("h");
-  sc_start(10000,SC_SEC);
+  sc_start(10000000000.0,SC_SEC);
   return h.status.read(); 
 }
 
