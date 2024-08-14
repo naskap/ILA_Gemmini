@@ -144,7 +144,8 @@ SC_MODULE(Testbench){
     for (int activation = 0; activation <= 1; activation++) {
       for (int scale = 0; scale <= 1; scale += 1) {
 #else
-  for (enum tiled_matmul_type_t option = OS; option <= CPU; option++) {
+  for (int option_int = OS; option_int <= CPU; option_int++) {
+    enum tiled_matmul_type_t option = tiled_matmul_type_t(option_int);
     for (int activation = 0; activation <= 2; activation++) {
       for (int scale = 0; scale <= 12; scale += 6) {
 #endif
@@ -187,20 +188,20 @@ SC_MODULE(Testbench){
                   }
                 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
+#pragma G++ diagnostic push
+#pragma G++ diagnostic ignored "-Wincompatible-pointer-types"
                 printf("Starting CPU matmul\n");
                 if (!a_transpose && !b_transpose) {
                   full_matmul(full_A, full_B, full_D, gold_full, repeating_bias);
                 } else if (a_transpose && !b_transpose) {
-                  full_matmul_At(full_A, full_B, full_D, gold_full, repeating_bias);
+                  full_matmul_At(reinterpret_cast<elem_t (*)[MAT_DIM_I]>(full_A), full_B, full_D, gold_full, repeating_bias);
                 } else if (!a_transpose && b_transpose) {
-                  full_matmul_Bt(full_A, full_B, full_D, gold_full, repeating_bias);
+                  full_matmul_Bt(full_A, reinterpret_cast<elem_t (*)[MAT_DIM_K]>(full_B), full_D, gold_full, repeating_bias);
                 } else if (a_transpose && b_transpose) {
-                  full_matmul_At_Bt(full_A, full_B, full_D, gold_full, repeating_bias);
+                  full_matmul_At_Bt(reinterpret_cast<elem_t (*)[MAT_DIM_I]>(full_A), reinterpret_cast<elem_t (*)[MAT_DIM_K]>(full_B), full_D, gold_full, repeating_bias);
                 }
                 full_matscale(gold_full, gold, scale);
-#pragma GCC diagnostic pop
+#pragma G++ diagnostic pop
 
                 if (activation == RELU) {
                   full_matrelu(gold, gold);

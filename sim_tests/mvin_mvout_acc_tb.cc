@@ -123,7 +123,7 @@ SC_MODULE(Testbench){
 
       // printf("Check\n");
       for (size_t n = 0; n < N; ++n){
-        // if (!is_equal(Out[n], Out_gold[n])) {
+        if (!is_equal(Out[n], Out_gold[n])) {
           printf("activation: %d, scale: %d\n", activation, scale);
 
           printf("Matrix %u:\n", n);
@@ -145,6 +145,7 @@ SC_MODULE(Testbench){
           status = 1; return;
         }
     }
+  }
   }
 
   status = 0; return;
