@@ -14,8 +14,6 @@ struct ConvParams {
     int batch_size;
     int in_row_dim;
     int in_col_dim;
-    int out_row_dim;
-    int out_col_dim;
     int kernel_size;
     int in_channels;
     int out_channels;
@@ -23,13 +21,14 @@ struct ConvParams {
     int padding;
     bool bias;
     bool depthwise;
+    int out_row_dim;
+    int out_col_dim;
     int n_patches;
     int patch_size;
-    acc_scale_t output_scale;
-    scale_t res_scale;
     int pool_size, pool_stride, pool_padding, out_dim_pooled;
-    
+    acc_scale_t output_scale;
     int I, J, K;
+    scale_t res_scale;
 };
 
 struct FcParams {
