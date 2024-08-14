@@ -160,13 +160,13 @@ void DefinePreload(Ila &child, ExprRef &spad, execute_statevars_t &svs){
     auto c = Ite(preload_transpose, svs.i, svs.j);
     auto load_cur_elmt = (svs.i < svs.preload_rows.SExt(32)) & 
                          (svs.j < svs.preload_cols.SExt(32));
-    auto load_zero = svs.preload_sp_addr == 0;
+    auto load_zero = ~svs.preload_sp_addr == 0;
     auto preload_value = Ite(!load_cur_elmt | load_zero, BvConst(0, INPUT_TYPE_WIDTH_BITS), 
                             GetMemElmt(spad, r + svs.preload_sp_addr, c, INPUT_TYPE_WIDTH_BITS));
                 
     
     // Store new systolic array row
-    auto systolic_array_next = SetMemElmt(svs.systolic_array, r, c, preload_value.SExt(ACC_TYPE_WIDTH_BITS));
+    auto systolic_array_next = SetMemElmt(svs.systolic_array, svs.i, svs.j, preload_value.SExt(ACC_TYPE_WIDTH_BITS));
     preload.SetUpdate(svs.systolic_array, systolic_array_next);
 
 
@@ -200,9 +200,9 @@ void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &s
     // Get seed element from spad
     auto bw = svs.i.bit_width();
     auto store_zero = (~bd_args.addr) == BvConst(0, 32) | 
-                    ((svs.i >= bd_args.rows.ZExt(bw)) & (svs.j >= bd_args.cols.ZExt(bw)));
-    auto elmt   =  Ite(store_zero, BvConst(0, ACC_TYPE_WIDTH_BITS),
-                                GetBvElmt(spad.Load(svs.i), svs.j, INPUT_TYPE_WIDTH_BITS).SExt(ACC_TYPE_WIDTH_BITS));
+                    ((svs.i >= bd_args.rows.ZExt(bw)) | (svs.j >= bd_args.cols.ZExt(bw)));
+    auto elmt   =  Ite(store_zero, BvConst(0, ACC_TYPE_WIDTH_BITS), 
+                GetMemElmt(spad, bd_args.addr + svs.i, svs.j, INPUT_TYPE_WIDTH_BITS).SExt(ACC_TYPE_WIDTH_BITS));
     
     // Store elemt
     auto ws_results_next = SetMemElmt(svs.ws_results, svs.i, svs.j, elmt);
@@ -260,7 +260,7 @@ void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &svs, compute
 
     // Get b tile element
     auto r = Ite(svs.b_transpose, svs.j, svs.k);
-    auto c = Ite(svs.a_transpose, svs.k, svs.j);
+    auto c = Ite(svs.b_transpose, svs.k, svs.j);
     auto store_zero = (~compute_args.bd.addr == 0) | ((svs.k >= compute_args.bd.rows.ZExt(svs.k.bit_width())) | (svs.j >= compute_args.bd.cols.ZExt(svs.j.bit_width())));
     auto b = Ite(store_zero, BvConst(0, INPUT_TYPE_WIDTH_BITS),
                 GetMemElmt(spad, compute_args.bd.addr + r.ZExt(spad.addr_width()), c, INPUT_TYPE_WIDTH_BITS));
@@ -376,8 +376,8 @@ ExprRef _RoundingRightShift(ExprRef const &x, ExprRef const &shift){
     unsigned int bw = x.bit_width();
     auto simple_shift = x >> shift;
     auto msb_shifted_out = (x >> (shift - 1)) & BvConst(1, bw);
-    auto other_ones_shifted_out = ((x) & ((BvConst(1, bw) << ((shift)-1)) - 1)) & BvConst(1, bw);
-    auto new_lsb_is_one = (simple_shift & BvConst(1, bw)) & BvConst(1, bw);
+    auto other_ones_shifted_out = Ite(((x) & ((BvConst(1, bw) << ((shift)-1)) - 1)) != 0, BvConst(1,bw), BvConst(0,bw)) ;
+    auto new_lsb_is_one = (simple_shift & BvConst(1, bw));
     auto round_factor = Ite(shift <= 1, BvConst(0, x.bit_width()), 
                                 msb_shifted_out & (other_ones_shifted_out | new_lsb_is_one));
     return simple_shift + round_factor;
