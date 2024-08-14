@@ -76,8 +76,8 @@ struct FcParams {
 
 // This function runs a tiled matrix multiplication, with explicit tiling
 // factors
-static void tiled_matmul_nn(size_t dim_I, size_t dim_J, size_t dim_K,
-        const elem_t A[dim_I][dim_K], const elem_t B[dim_K][dim_J],
+template <size_t dim_I, size_t dim_J, size_t dim_K>
+static void tiled_matmul_nn(const elem_t A[dim_I][dim_K], const elem_t B[dim_K][dim_J],
         const void * D, elem_t C[dim_I][dim_J],
         int act, acc_scale_t scale, bool repeating_bias,
         size_t tile_I, size_t tile_J, size_t tile_K,
@@ -120,8 +120,8 @@ static void tiled_matmul_nn(size_t dim_I, size_t dim_J, size_t dim_K,
 
 // This function runs a tiled matrix multiplication, with automatically
 // calculated tiling factors
-static void tiled_matmul_nn_auto(size_t dim_I, size_t dim_J, size_t dim_K,
-        const elem_t A[dim_I][dim_K], const elem_t B[dim_K][dim_J],
+template <size_t dim_I, size_t dim_J, size_t dim_K>
+static void tiled_matmul_nn_auto(const elem_t A[dim_I][dim_K], const elem_t B[dim_K][dim_J],
         const void * D, elem_t C[dim_I][dim_J],
         int act, acc_scale_t scale, bool repeating_bias,
         enum tiled_matmul_type_t tiled_matmul_type,
@@ -160,12 +160,12 @@ static void tiled_matmul_nn_auto(size_t dim_I, size_t dim_J, size_t dim_K,
     }
 }
 
-static void conv_dw(size_t I, size_t J,
+template <size_t I, size_t J, 
     const size_t batch_size, const size_t channels,
     const size_t in_row_dim, const size_t in_col_dim,
     const size_t out_row_dim, const size_t out_col_dim,
-    const size_t kernel_size,
-    const elem_t input[batch_size][in_row_dim][in_col_dim][channels],
+    const size_t kernel_size>
+static void conv_dw(const elem_t input[batch_size][in_row_dim][in_col_dim][channels],
     const elem_t weight[channels][kernel_size][kernel_size],
     const acc_t * bias,
     // elem_t output [batch_size][out_row_dim][out_col_dim][channels],
@@ -218,9 +218,9 @@ static void conv_dw(size_t I, size_t J,
     }
 }
 
-static void conv_dw_with_col2im(size_t prev_I, size_t prev_J, size_t I, size_t J,
-    const size_t batch_size, const size_t channels,
-    const size_t out_row_dim, const size_t out_col_dim, const size_t kernel_size,
+template <size_t prev_I, size_t prev_J, size_t I, size_t J,
+    const size_t batch_size, const size_t channels, const size_t kernel_size>
+static void conv_dw_with_col2im(const size_t out_row_dim, const size_t out_col_dim,
     const elem_t input[prev_I][prev_J],
     const elem_t weight[channels][kernel_size][kernel_size],
     const acc_t * bias,
@@ -278,9 +278,9 @@ static void conv_dw_with_col2im(size_t prev_I, size_t prev_J, size_t I, size_t J
     }
 }
 
-static void im2col(size_t batch_size, size_t channels, size_t im_row_dim, size_t im_col_dim,
-    size_t I, size_t K,
-    const elem_t input[batch_size][im_row_dim][im_col_dim][channels],
+template <size_t batch_size, size_t channels, size_t im_row_dim, size_t im_col_dim,
+    size_t I, size_t K>
+static void im2col(const elem_t input[batch_size][im_row_dim][im_col_dim][channels],
     elem_t output[I][K],
     const struct ConvParams * params)
 {
@@ -315,8 +315,9 @@ static void im2col(size_t batch_size, size_t channels, size_t im_row_dim, size_t
     }
 }
 
-static void im2col_with_col2im(size_t prev_I, size_t prev_J,
-    size_t next_I, size_t next_K,
+template <size_t prev_I, size_t prev_J,
+    size_t next_I, size_t next_K>
+static void im2col_with_col2im(
     const elem_t input[prev_I][prev_J],
     elem_t output[next_I][next_K],
     const struct ConvParams * params)
@@ -370,8 +371,8 @@ void vecadd(size_t len, const elem_t * A, const elem_t * B, elem_t * C, scale_t 
     }
 }
 
-void resadd1(const size_t batch_size, const size_t channels, const size_t im_dim,
-    const elem_t A[batch_size][im_dim][im_dim][channels],
+template <const size_t batch_size, const size_t channels, const size_t im_dim>
+void resadd1(const elem_t A[batch_size][im_dim][im_dim][channels],
     const elem_t B[batch_size][im_dim][im_dim][channels],
     elem_t C[batch_size][im_dim][im_dim][channels],
     bool relu,
@@ -398,9 +399,9 @@ void resadd1(const size_t batch_size, const size_t channels, const size_t im_dim
     }
 }
 
-void resadd2(const size_t I, const size_t J,
-    const size_t batch_size, const size_t channels, const size_t im_dim,
-    const elem_t A[I][J],
+template <const size_t I, const size_t J,
+    const size_t batch_size, const size_t channels, const size_t im_dim>
+void resadd2(const elem_t A[I][J],
     const elem_t B[batch_size][im_dim][im_dim][channels],
     elem_t C[batch_size][im_dim][im_dim][channels],
     bool relu,
@@ -428,9 +429,8 @@ void resadd2(const size_t I, const size_t J,
         }
     }
 }
-
-void resadd3(const size_t I, const size_t J,
-    const elem_t A[I][J],
+template <const size_t I, const size_t J>
+void resadd3(const elem_t A[I][J],
     const elem_t B[I][J],
     elem_t C[I][J],
     bool relu,
@@ -460,9 +460,9 @@ void resadd3(const size_t I, const size_t J,
 }
 
 // Pooling
-void pool(size_t batch_size, size_t channels, size_t in_row_dim, size_t in_col_dim,
-    size_t out_row_dim, size_t out_col_dim,
-    elem_t input[batch_size][in_row_dim][in_col_dim][channels],
+template <size_t batch_size, size_t channels, size_t in_row_dim, size_t in_col_dim,
+    size_t out_row_dim, size_t out_col_dim>
+void pool(elem_t input[batch_size][in_row_dim][in_col_dim][channels],
     elem_t output[batch_size][out_row_dim][out_col_dim][channels],
     const struct ConvParams * params)
 {
@@ -504,8 +504,9 @@ void pool(size_t batch_size, size_t channels, size_t in_row_dim, size_t in_col_d
     }
 }
 
-void pool_with_col2im(size_t I, size_t J,
-    size_t batch_size, size_t channels, size_t out_row_dim, size_t out_col_dim,
+template <size_t I, size_t J,
+    size_t batch_size, size_t channels, size_t out_row_dim, size_t out_col_dim>
+void pool_with_col2im(
     elem_t input[I][J],
     elem_t output[batch_size][out_row_dim][out_col_dim][channels],
     const struct ConvParams * params)
