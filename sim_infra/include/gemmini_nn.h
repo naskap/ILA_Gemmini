@@ -35,9 +35,8 @@ struct FcParams {
     int batch_size;
     int in_features;
     int out_features;
-    acc_scale_t output_scale;
     bool bias;
-
+    acc_scale_t output_scale;
     int I, J, K;
 };
 
@@ -75,14 +74,17 @@ struct FcParams {
 
 // This function runs a tiled matrix multiplication, with explicit tiling
 // factors
-template <size_t dim_I, size_t dim_J, size_t dim_K>
-static void tiled_matmul_nn(const elem_t A[dim_I][dim_K], const elem_t B[dim_K][dim_J],
-        const void * D, elem_t C[dim_I][dim_J],
+static void tiled_matmul_nn(size_t dim_I, size_t dim_J, size_t dim_K,
+        const elem_t *A_ptr, const elem_t *B_ptr,
+        const void * D, elem_t *C_ptr,
         int act, acc_scale_t scale, bool repeating_bias,
         size_t tile_I, size_t tile_J, size_t tile_K,
         enum tiled_matmul_type_t tiled_matmul_type,
         bool check, char * layer_name)
 {
+    const elem_t (*A)[dim_K]=reinterpret_cast<const elem_t (*)[dim_K]>(A_ptr);
+    const elem_t (*B)[dim_J]=reinterpret_cast<const elem_t (*)[dim_J]>(B_ptr);
+    elem_t (*C)[dim_J]=reinterpret_cast<elem_t (*)[dim_J]>(C_ptr);
     if (check)
         printf("%s: gemmini\n", layer_name);
 
@@ -119,13 +121,16 @@ static void tiled_matmul_nn(const elem_t A[dim_I][dim_K], const elem_t B[dim_K][
 
 // This function runs a tiled matrix multiplication, with automatically
 // calculated tiling factors
-template <size_t dim_I, size_t dim_J, size_t dim_K>
-static void tiled_matmul_nn_auto(const elem_t A[dim_I][dim_K], const elem_t B[dim_K][dim_J],
-        const void * D, elem_t C[dim_I][dim_J],
+static void tiled_matmul_nn_auto(size_t dim_I, size_t dim_J, size_t dim_K,
+        const elem_t *A_ptr, const elem_t *B_ptr,
+        const void * D, elem_t *C_ptr,
         int act, acc_scale_t scale, bool repeating_bias,
         enum tiled_matmul_type_t tiled_matmul_type,
         bool check, char * layer_name)
 {
+    const elem_t (*A)[dim_K]=reinterpret_cast<const elem_t (*)[dim_K]>(A_ptr);
+    const elem_t (*B)[dim_J]=reinterpret_cast<const elem_t (*)[dim_J]>(B_ptr);
+    elem_t (*C)[dim_J]=reinterpret_cast<elem_t (*)[dim_J]>(C_ptr);
     if (check)
         printf("%s: gemmini\n", layer_name);
 
@@ -159,18 +164,21 @@ static void tiled_matmul_nn_auto(const elem_t A[dim_I][dim_K], const elem_t B[di
     }
 }
 
-template <size_t I, size_t J, 
+static void conv_dw(size_t I, size_t J,
     const size_t batch_size, const size_t channels,
     const size_t in_row_dim, const size_t in_col_dim,
     const size_t out_row_dim, const size_t out_col_dim,
-    const size_t kernel_size>
-static void conv_dw(const elem_t input[batch_size][in_row_dim][in_col_dim][channels],
-    const elem_t weight[channels][kernel_size][kernel_size],
+    const size_t kernel_size,
+    const elem_t *input_ptr,
+    const elem_t *weight_ptr,
     const acc_t * bias,
-    // elem_t output [batch_size][out_row_dim][out_col_dim][channels],
-    elem_t output [I][J],
+    // elem_t *output_ptr elem_t (*output)[out_row_dim][out_col_dim][channels]=reinterpret_cast<elem_t (*)[out_row_dim][out_col_dim][channels]>(output_ptr);,
+    elem_t *output_ptr,
     const struct ConvParams * params)
 {
+    const elem_t (*input)[in_row_dim][in_col_dim][channels]=reinterpret_cast<const elem_t (*)[in_row_dim][in_col_dim][channels]>(input_ptr);
+    const elem_t (*weight)[kernel_size][kernel_size]=reinterpret_cast<const elem_t (*)[kernel_size][kernel_size]>(weight_ptr);
+    elem_t (*output)[J]=reinterpret_cast<elem_t (*)[J]>(output_ptr);
     for (int batch = 0; batch < batch_size; batch++) {
         for (int channel = 0; channel < channels; channel++) {
             for (int out_row = 0; out_row < out_row_dim; out_row++) {
@@ -217,16 +225,19 @@ static void conv_dw(const elem_t input[batch_size][in_row_dim][in_col_dim][chann
     }
 }
 
-template <size_t prev_I, size_t prev_J, size_t I, size_t J,
-    const size_t batch_size, const size_t channels, const size_t kernel_size>
-static void conv_dw_with_col2im(const size_t out_row_dim, const size_t out_col_dim,
-    const elem_t input[prev_I][prev_J],
-    const elem_t weight[channels][kernel_size][kernel_size],
+static void conv_dw_with_col2im(size_t prev_I, size_t prev_J, size_t I, size_t J,
+    const size_t batch_size, const size_t channels,
+    const size_t out_row_dim, const size_t out_col_dim, const size_t kernel_size,
+    const elem_t *input_ptr ,
+    const elem_t *weight_ptr,
     const acc_t * bias,
-    // elem_t output [batch_size][out_dim][out_dim][channels],
-    elem_t output [I][J],
+    // elem_t *output_ptr elem_t (*output)[out_dim][out_dim][channels]=reinterpret_cast<elem_t (*)[out_dim][out_dim][channels]>(output_ptr);,
+    elem_t *output_ptr ,
     const struct ConvParams * params)
 {
+    const elem_t (*input)[prev_J]=reinterpret_cast<const elem_t (*)[prev_J]>(input_ptr);
+    const elem_t (*weight)[kernel_size][kernel_size]=reinterpret_cast<const elem_t (*)[kernel_size][kernel_size]>(weight_ptr);
+    elem_t (*output)[J]=reinterpret_cast<elem_t (*)[J]>(output_ptr);
     for (int batch = 0; batch < batch_size; batch++) {
         for (int channel = 0; channel < channels; channel++) {
             for (int out_row = 0; out_row < out_row_dim; out_row++) {
@@ -277,12 +288,14 @@ static void conv_dw_with_col2im(const size_t out_row_dim, const size_t out_col_d
     }
 }
 
-template <size_t batch_size, size_t channels, size_t im_row_dim, size_t im_col_dim,
-    size_t I, size_t K>
-static void im2col(const elem_t input[batch_size][im_row_dim][im_col_dim][channels],
-    elem_t output[I][K],
+static void im2col(size_t batch_size, size_t channels, size_t im_row_dim, size_t im_col_dim,
+    size_t I, size_t K,
+    const elem_t *input_ptr,
+    elem_t *output_ptr,
     const struct ConvParams * params)
 {
+    const elem_t (*input)[im_row_dim][im_col_dim][channels]=reinterpret_cast<const elem_t (*)[im_row_dim][im_col_dim][channels]>(input_ptr);
+    elem_t (*output)[K]=reinterpret_cast<elem_t (*)[K]>(output_ptr);
     int patch_row = 0;
 
     for (int n_batch = 0; n_batch < params->batch_size; n_batch++) {
@@ -314,13 +327,14 @@ static void im2col(const elem_t input[batch_size][im_row_dim][im_col_dim][channe
     }
 }
 
-template <size_t prev_I, size_t prev_J,
-    size_t next_I, size_t next_K>
-static void im2col_with_col2im(
-    const elem_t input[prev_I][prev_J],
-    elem_t output[next_I][next_K],
+static void im2col_with_col2im(size_t prev_I, size_t prev_J,
+    size_t next_I, size_t next_K,
+    const elem_t *input_ptr,
+    elem_t *output_ptr,
     const struct ConvParams * params)
 {
+    const elem_t (*input)[prev_J]=reinterpret_cast<const elem_t (*)[prev_J]>(input_ptr);
+    elem_t (*output)[next_K]=reinterpret_cast<elem_t (*)[next_K]>(output_ptr);
     int out_row = 0;
 
     for (int n_batch = 0; n_batch < params->batch_size; n_batch++) {
@@ -370,13 +384,15 @@ void vecadd(size_t len, const elem_t * A, const elem_t * B, elem_t * C, scale_t 
     }
 }
 
-template <const size_t batch_size, const size_t channels, const size_t im_dim>
-void resadd1(const elem_t A[batch_size][im_dim][im_dim][channels],
-    const elem_t B[batch_size][im_dim][im_dim][channels],
-    elem_t C[batch_size][im_dim][im_dim][channels],
+void resadd1(const size_t batch_size, const size_t channels, const size_t im_dim,
+    const elem_t *A_ptr,
+    const elem_t *B_ptr ,
+    elem_t *C_ptr,
     bool relu,
     const struct ConvParams * params) {
-
+        const elem_t (*A)[im_dim][im_dim][channels]=reinterpret_cast<const elem_t (*)[im_dim][im_dim][channels]>(A_ptr);
+        const elem_t (*B)[im_dim][im_dim][channels]=reinterpret_cast<const elem_t (*)[im_dim][im_dim][channels]>(B_ptr);
+        elem_t (*C)[im_dim][im_dim][channels]=reinterpret_cast<elem_t (*)[im_dim][im_dim][channels]>(C_ptr);
     const int minimum = relu ? 0 : elem_t_min;
 
     for (size_t batch = 0; batch < params->batch_size; batch++) {
@@ -398,13 +414,16 @@ void resadd1(const elem_t A[batch_size][im_dim][im_dim][channels],
     }
 }
 
-template <const size_t I, const size_t J,
-    const size_t batch_size, const size_t channels, const size_t im_dim>
-void resadd2(const elem_t A[I][J],
-    const elem_t B[batch_size][im_dim][im_dim][channels],
-    elem_t C[batch_size][im_dim][im_dim][channels],
+void resadd2(const size_t I, const size_t J,
+    const size_t batch_size, const size_t channels, const size_t im_dim,
+    const elem_t *A_ptr ,
+    const elem_t *B_ptr ,
+    elem_t *C_ptr ,
     bool relu,
     const struct ConvParams * params) {
+    const elem_t (*A)[J]=reinterpret_cast<const elem_t (*)[J]>(A_ptr);
+    const elem_t (*B)[im_dim][im_dim][channels]=reinterpret_cast<const elem_t (*)[im_dim][im_dim][channels]>(B_ptr);
+    elem_t (*C)[im_dim][im_dim][channels]=reinterpret_cast<elem_t (*)[im_dim][im_dim][channels]>(C_ptr);
 
     const int minimum = relu ? 0 : elem_t_min;
 
@@ -428,12 +447,16 @@ void resadd2(const elem_t A[I][J],
         }
     }
 }
-template <const size_t I, const size_t J>
-void resadd3(const elem_t A[I][J],
-    const elem_t B[I][J],
-    elem_t C[I][J],
+
+void resadd3(const size_t I, const size_t J,
+    const elem_t *A_ptr,
+    const elem_t *B_ptr,
+    elem_t *C_ptr ,
     bool relu,
     const struct ConvParams * params) {
+    const elem_t (*A)[J]=reinterpret_cast<const elem_t (*)[J]>(A_ptr);
+    const elem_t (*B)[J]=reinterpret_cast<const elem_t (*)[J]>(B_ptr);
+    elem_t (*C)[J]=reinterpret_cast<elem_t (*)[J]>(C_ptr);
 
     const int minimum = relu ? 0 : elem_t_min;
 
@@ -459,12 +482,15 @@ void resadd3(const elem_t A[I][J],
 }
 
 // Pooling
-template <size_t batch_size, size_t channels, size_t in_row_dim, size_t in_col_dim,
-    size_t out_row_dim, size_t out_col_dim>
-void pool(elem_t input[batch_size][in_row_dim][in_col_dim][channels],
-    elem_t output[batch_size][out_row_dim][out_col_dim][channels],
+void pool(size_t batch_size, size_t channels, size_t in_row_dim, size_t in_col_dim,
+    size_t out_row_dim, size_t out_col_dim,
+    elem_t *input_ptr,
+    elem_t *output_ptr,
     const struct ConvParams * params)
 {
+    elem_t (*input)[in_row_dim][in_col_dim][channels]=reinterpret_cast<elem_t (*)[in_row_dim][in_col_dim][channels]>(input_ptr);
+    elem_t (*output)[out_row_dim][out_col_dim][channels]=reinterpret_cast<elem_t (*)[out_row_dim][out_col_dim][channels]>(output_ptr);
+    
     size_t kernel_size = params->pool_size;
     size_t stride = params->pool_stride;
     // size_t in_dim = params->out_dim;
@@ -503,13 +529,15 @@ void pool(elem_t input[batch_size][in_row_dim][in_col_dim][channels],
     }
 }
 
-template <size_t I, size_t J,
-    size_t batch_size, size_t channels, size_t out_row_dim, size_t out_col_dim>
-void pool_with_col2im(
-    elem_t input[I][J],
-    elem_t output[batch_size][out_row_dim][out_col_dim][channels],
+void pool_with_col2im(size_t I, size_t J,
+    size_t batch_size, size_t channels, size_t out_row_dim, size_t out_col_dim,
+    elem_t *input_ptr,
+    elem_t *output_ptr,
     const struct ConvParams * params)
 {
+
+    elem_t (*input)[J]=reinterpret_cast<elem_t (*)[J]>(input_ptr);
+    elem_t (*output)[out_row_dim][out_col_dim][channels]=reinterpret_cast<elem_t (*)[out_row_dim][out_col_dim][channels]>(output_ptr);
     size_t kernel_size = params->pool_size;
     size_t stride = params->pool_stride;
     size_t in_row_dim = params->out_row_dim;
