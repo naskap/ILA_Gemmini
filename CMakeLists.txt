@@ -37,6 +37,7 @@ add_executable(${MyTarget}
   src/store.cc
   src/execute.cc
   src/utils.cc
+  src/loop_ws.cc
 )
 
 target_include_directories(${MyTarget} PRIVATE include)

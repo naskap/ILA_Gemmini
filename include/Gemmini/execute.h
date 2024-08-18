@@ -8,43 +8,6 @@ enum dataflow_t {OS, WS};
 
 enum compute_child_states {INACTIVE, PRELOAD, INITIALIZE_WS_RESULTS, WS_COMPUTE, OS_COMPUTE, OUTPUT_RESULTS};
 
-struct execute_statevars_t {
-    ExprRef dataflow = (ExprRef) NULL;
-    ExprRef act = (ExprRef) NULL;
-    ExprRef sys_shift = (ExprRef) NULL;
-    ExprRef sys_acc_shift = (ExprRef) NULL;
-    ExprRef a_transpose = (ExprRef) NULL;
-    ExprRef b_transpose = (ExprRef) NULL;
-    ExprRef c_stride = (ExprRef) NULL;
-    ExprRef a_stride = (ExprRef) NULL;
-
-    ExprRef preload_sp_addr = (ExprRef) NULL;
-    ExprRef output_sp_addr = (ExprRef) NULL;
-    ExprRef preload_cols = (ExprRef) NULL;
-    ExprRef preload_rows = (ExprRef) NULL;
-    ExprRef output_cols = (ExprRef) NULL;
-    ExprRef output_rows = (ExprRef) NULL;
-
-    ExprRef systolic_array = (ExprRef) NULL;
-    ExprRef ws_results = (ExprRef) NULL;
-    ExprRef child_state = (ExprRef) NULL;
-
-    ExprRef i =(ExprRef) NULL;
-    ExprRef j = (ExprRef) NULL;
-    ExprRef k =(ExprRef) NULL;
-
-};
-
-struct tile_compute_args_t {
-    ExprRef addr = (ExprRef) NULL;
-    ExprRef rows = (ExprRef) NULL;
-    ExprRef cols = (ExprRef) NULL;
-};
-
-struct compute_args_t {
-    tile_compute_args_t a;
-    tile_compute_args_t bd;
-};
 
 void DefineExecuteStatevars(Ila& m, execute_statevars_t &execute_statevars);
 void DefineMatmulPreload(Ila& m, command_t& command, execute_statevars_t &execute_statevars);

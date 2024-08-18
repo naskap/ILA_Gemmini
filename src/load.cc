@@ -4,19 +4,16 @@ namespace ilang {
 
 namespace Gemmini {
 
-void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory) {
-
-  load_statevars_t* load_statevars = 
-      (load_statevars_t*)malloc(sizeof(load_statevars_t) * 3);
+void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory, load_statevars_t load_statevars[NUM_MVIN_CONFIG_SETS]) {
 
   DefineLoadStateVars(m, load_statevars);
   DefineConfigLoadInstructions(m, command, load_statevars);
   DefineLoadInstructions(m, command, memory, load_statevars);
 }
 
-void DefineLoadStateVars(Ila& m, load_statevars_t* load_statevars) {
+void DefineLoadStateVars(Ila& m, load_statevars_t load_statevars[NUM_MVIN_CONFIG_SETS]) {
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < NUM_MVIN_CONFIG_SETS; i++) {
 
     // Load configs
     load_statevars[i].src_stride = 
@@ -46,7 +43,7 @@ void DefineConfigLoadInstructions(Ila& m, command_t command,
                                   load_statevars_t* load_statevars) {
 
   InstrRef* config_load = (InstrRef*)malloc(sizeof(InstrRef) * 3);
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < NUM_MVIN_CONFIG_SETS; i++) {
 
     // Declare instruction
     config_load[i] = m.NewInstr("CONFIG_LOAD" + std::to_string(i));
@@ -69,11 +66,11 @@ void DefineConfigLoadInstructions(Ila& m, command_t command,
 }
 
 void DefineLoadInstructions(Ila& m, command_t command, gemmini_memory_t memory,
-                            load_statevars_t* load_statevars) {
+                            load_statevars_t load_statevars[NUM_MVIN_CONFIG_SETS]) {
 
   InstrRef *load     = (InstrRef*) malloc(sizeof(InstrRef) * 3);
   Ila      *children = (Ila *) malloc(sizeof(Ila)*3);
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < NUM_MVIN_CONFIG_SETS; i++) {
 
     // Parent load instruction defn, decode, and update
     load[i] = m.NewInstr("load" + std::to_string(i));

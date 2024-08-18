@@ -6,9 +6,8 @@ namespace ilang {
 namespace Gemmini {
 
 
-void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory) {
+void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory, store_statevars_t &store_statevars) {
 
-  store_statevars_t store_statevars;
   DefineStoreStateVars(m, store_statevars);
   DefineConfigStoreInstruction(m, command, store_statevars);
   DefineStoreInstruction(m, command, memory, store_statevars);

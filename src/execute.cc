@@ -4,16 +4,13 @@ namespace ilang {
 
 namespace Gemmini {
 
-void DefineExecute(Ila& m, command_t& command, gemmini_memory_t memory){
+void DefineExecute(Ila& m, command_t& command, gemmini_memory_t memory, execute_statevars_t &svs){
 
-    execute_statevars_t svs;
-    
     DefineExecuteStatevars(m, svs);
     DefineConfigExecute(m, command, svs);
     DefineMatmulPreload(m, command, svs);
     
     DefineComputeMatmul(m, command, svs, memory);
-    // DefineStoreOutputChild(m, command, svs, memory);
 }
 
 void DefineExecuteStatevars(Ila& m, execute_statevars_t &svs){

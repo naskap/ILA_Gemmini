@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <ilang/ilang++.h>
 #include <Gemmini/utils.h>
+#include <Gemmini/statevars.h>
 
 #define INSTR_FUNCT_WIDTH 7
 #define INSTR_RS2_WIDTH 64
@@ -67,73 +68,6 @@
 #define SPAD_ENTRIES 1024 * 256
 #define ACC_ENTRIES 1024 * 64
 
-// Macros that might be helpful in the future
-// #define CISC_CONFIG 10
-// #define ADDR_AB 11
-// #define ADDR_CD 12
-// #define SIZE_MN 13
-// #define SIZE_K 14
-// #define RPT_BIAS 15
-// #define RESET 16
-// #define COMPUTE_CISC 17
-// #define COUNTER_OP 126
-// #define GARBAGE_ADDR       "hffffffff"
-// #define MVIN_RS2_ADDR_WIDTH  32
-// #define MVIN_RS2_COLS_WIDTH  16
-// #define MVIN_RS2_ROWS_WIDTH  16
-// #define MVOUT_RS2_ADDR_WIDTH  32
-// #define MVOUT_RS2_COLS_WIDTH  16
-// #define MVOUT_RS2_ROWS_WIDTH  16
-// #define CONFIG_MVIN_RS1_UNUSED_WIDTH  2
-// #define CONFIG_MVIN_RS1_SHRINK_WIDTH  1
-// #define CONFIG_MVIN_RS1_STATE_ID_WIDTH  2
-// #define CONFIG_MVIN_RS1_SPACER_WIDTH  8 - 2 - 1 - 2
-// #define CONFIG_MVIN_RS1_PIXEL_REPEAT_WIDTH  8
-// #define CONFIG_MVIN_RS1_STRIDE_WIDTH  16
-// #define CONFIG_MVIN_RS1_SCALE_WIDTH  32
-// #define CONFIG_MVOUT_RS1_CMD_TYPE_WIDTH  2
-// #define CONFIG_MVOUT_RS1_ACTIVATION_WIDTH  2
-// #define CONFIG_MVOUT_RS1_MAX_POOLING_STRIDE_WIDTH  2
-// #define CONFIG_MVOUT_RS1_MAX_POOLING_WINDOW_SIZE_WIDTH  2
-// #define CONFIG_MVOUT_RS1_UPPER_ZERO_PADDING_WIDTH  2
-// #define CONFIG_MVOUT_RS1_LEFT_ZERO_PADDING_WIDTH  2
-// #define CONFIG_MVOUT_RS1_SPACER_WIDTH  (24 - 2 * 6)
-// #define CONFIG_MVOUT_RS1_POOL_OUT_DIM_WIDTH  8
-// #define CONFIG_MVOUT_RS1_POOL_OUT_ROWS_WIDTH  8
-// #define CONFIG_MVOUT_RS1_POOL_OUT_COLS_WIDTH  8
-// #define CONFIG_MVOUT_RS1_OUT_ROWS_WIDTH  8
-// #define CONFIG_MVOUT_RS1_OUT_COLS_WIDTH  8
-// #define CONFIG_MVOUT_RS2_ACC_SCALE_WIDTH  32
-// #define CONFIG_MVOUT_RS2_STRIDE_WIDTH  32
-// #define CONFIG_NORM_RS1_Q_CONST_WIDTH  32
-// #define CONFIG_NORM_RS1_SPACER1_WIDTH  13
-// #define CONFIG_NORM_RS1_Q_CONST_TYPE_WIDTH  1
-// #define CONFIG_NORM_RS1_SET_STATS_ID_ONLY_WIDTH  1
-// #define CONFIG_NORM_RS1_ACT_MSB_WIDTH  1
-// #define CONFIG_NORM_RS1_NORM_STATS_ID_WIDTH  8
-// #define CONFIG_NORM_RS1_SPACER0_WIDTH  6
-// #define CONFIG_NORM_RS1_CMD_TYPE_WIDTH  2
-// #define CONFIG_NORM_RS2_QC_WIDTH  32
-// #define CONFIG_NORM_RS2_QB_WIDTH  32
-// #define CONFIG_EX_RS1_CMD_TYPE_WIDTH  2
-// #define CONFIG_EX_RS1_DATAFLOW_WIDTH  1
-// #define CONFIG_EX_RS1_ACTIVATION_WIDTH  2
-// #define CONFIG_EX_RS1_SPACER0_WIDTH  (7 - 2 - 1 - 2)
-// #define CONFIG_EX_RS1_SET_ONLY_STRIDES_WIDTH  1
-// #define CONFIG_EX_RS1_A_TRANSPOSE_WIDTH  1
-// #define CONFIG_EX_RS1_B_TRANSPOSE_WIDTH  1
-// #define CONFIG_EX_RS1_SPACER1_WIDTH  (16 - 10)
-// #define CONFIG_EX_RS1_A_STRIDE_WIDTH  16
-// #define CONFIG_EX_RS1_ACC_SCALE_WIDTH  32
-// #define CONFIG_EX_RS2_IN_SHIFT_WIDTH  32
-// #define CONFIG_EX_RS2_RELU6_SHIFT_WIDTH  16
-// #define CONFIG_EX_RS2_C_STRIDE_WIDTH  16
-// #define PRELOAD_RS_ADDR_WIDTH  32
-// #define PRELOAD_RS_COLS_WIDTH  16
-// #define PRELOAD_RS_ROWS_WIDTH  16
-// #define COMPUTED_RS_ADDR_WIDTH  32
-// #define COMPUTED_RS_COLS_WIDTH  16
-// #define COMPUTED_RS_ROWS_WIDTH  16
 
 namespace ilang {
 
@@ -156,9 +90,13 @@ enum Activation {NONE, ReLU};
 
 
 Ila GetGemminiIla(const std::string& model_name = "Gemmini");
-extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory);
-extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory);
-extern void DefineExecute(Ila& m, command_t& command, gemmini_memory_t memory);
+static void DefineCommand(Ila &m, command_t *c);
+static void DefineMemory(Ila &m, gemmini_memory_t *mem);
+extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory, load_statevars_t *load_statevars_t);
+extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory, store_statevars_t &store_statevars);
+extern void DefineExecute(Ila& m, command_t& command, gemmini_memory_t memory, execute_statevars_t &execute_statevars);
+extern void DefineLoopWS(Ila& m, command_t& command, gemmini_memory_t memory, gemmini_statevars_t &svs);
+extern void DefineLoopConv(Ila& m, command_t& command, gemmini_memory_t memory, gemmini_statevars_t &svs);
 
 
 // Uninterpreted functions
