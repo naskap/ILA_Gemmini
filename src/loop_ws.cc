@@ -143,7 +143,7 @@ void DefineLoopWSInstruction(Ila &m, command_t &command, gemmini_statevars_t &sv
     auto child = m.NewChild("loop_ws_child");
     child.SetValid((svs.loop_ws.child_state != loop_ws_child_states::INACTIVE) & (svs.load[0].child_valid == false) & (svs.store.child_valid == false) & (svs.exec.child_state == 0));
     DefineLoadD(child, svs);
-    // DefineGetSPAddrs(child, svs);
+    DefineGetSPAddrs(child, svs);
     // DefineMvinA(child, svs);
     // DefineMvinB(child, svs);
     // DefineCompute(child, svs);
@@ -164,7 +164,7 @@ void DefineLoadD(Ila &child, gemmini_statevars_t &svs){
     auto sp_addr = svs.loop_ws.D_sp_addr_start + (svs.loop_ws.i.ZExt(32) * svs.loop_ws.J.ZExt(32) + svs.loop_ws.j.ZExt(32)) * ARRAY_DIM;
 
     auto cols = BvConst(ARRAY_DIM, 16) - Ite(svs.loop_ws.j == (svs.loop_ws.J - 1), svs.loop_ws.pad_J, BvConst(0, 16));
-    auto rows  = BvConst(ARRAY_DIM, 16) - Ite(svs.loop_ws.i == (svs.loop_ws.I - 1), svs.loop_ws.pad_I, BvConst(0, 16));
+    auto rows = BvConst(ARRAY_DIM, 16) - Ite(svs.loop_ws.i == (svs.loop_ws.I - 1), svs.loop_ws.pad_I, BvConst(0, 16));
 
     _CallMvin(load_d, svs.load[2], dram_addr, sp_addr, rows, cols);
 
@@ -172,8 +172,9 @@ void DefineLoadD(Ila &child, gemmini_statevars_t &svs){
     std::vector<ExprRef> iteration_vars = {svs.loop_ws.i, svs.loop_ws.j};
     std::vector<ExprRef> iteration_maxs = {svs.loop_ws.I, svs.loop_ws.J};
     auto last_pixel                     = IterateLoopVars(load_d, iteration_vars, iteration_maxs);
-    load_d.SetUpdate(svs.loop_ws.child_state, Ite(last_pixel, BvConst(loop_ws_child_states::COMPUTE, svs.loop_ws.child_state.bit_width()),
-                                                              BvConst(loop_ws_child_states::LOAD_D, svs.loop_ws.child_state.bit_width())));
+    auto next_child_state               = Ite(last_pixel, BvConst(loop_ws_child_states::COMPUTE, svs.loop_ws.child_state.bit_width()),
+                                                              BvConst(loop_ws_child_states::LOAD_D, svs.loop_ws.child_state.bit_width()));
+    load_d.SetUpdate(svs.loop_ws.child_state, next_child_state);
 
 }
 
@@ -187,6 +188,32 @@ void _CallMvin(InstrRef &caller, load_statevars_t &load_svs, ExprRef &dram_addr,
     caller.SetUpdate(load_svs.child_valid, BoolConst(true));
 
 }
+
+void DefineGetSPAddrs(Ila &child, gemmini_statevars_t &svs){
+
+    auto get_sp_addrs = child.NewInstr("loop_ws_get_sp_addrs");
+    get_sp_addrs.SetDecode(svs.loop_ws.child_state == loop_ws_child_states::GET_SP_ADDRS);
+    
+    auto a_row      = Ite(svs.loop_ws.a_transpose, svs.loop_ws.k, svs.loop_ws.i).ZExt(32);
+    auto a_num_cols = Ite(svs.loop_ws.a_transpose, svs.loop_ws.I, svs.loop_ws.K).ZExt(32);
+    auto a_col      = Ite(svs.loop_ws.a_transpose, svs.loop_ws.i, svs.loop_ws.k).ZExt(32);
+    get_sp_addrs.SetUpdate(svs.loop_ws.A_sp_addr, svs.loop_ws.A_sp_addr_start + (a_row * a_num_cols + a_col) * ARRAY_DIM);
+
+    auto b_row      = Ite(svs.loop_ws.b_transpose, svs.loop_ws.j, svs.loop_ws.k).ZExt(32);
+    auto b_num_cols = Ite(svs.loop_ws.b_transpose, svs.loop_ws.K, svs.loop_ws.J).ZExt(32);
+    auto b_col      = Ite(svs.loop_ws.b_transpose, svs.loop_ws.k, svs.loop_ws.j).ZExt(32);
+    get_sp_addrs.SetUpdate(svs.loop_ws.B_sp_addr, svs.loop_ws.B_sp_addr_start + (b_row * b_num_cols + b_col) * ARRAY_DIM);
+
+    get_sp_addrs.SetUpdate(svs.loop_ws.C_sp_addr, svs.loop_ws.C_sp_addr_start + (svs.loop_ws.i.ZExt(32) * svs.loop_ws.J.ZExt(32) + svs.loop_ws.j.ZExt(32)) * ARRAY_DIM);
+
+    auto next_child_state = Ite(svs.loop_ws.j == 0, BvConst(loop_ws_child_states::MVIN_A, svs.loop_ws.child_state.bit_width()),
+                            Ite(svs.loop_ws.i == 0, BvConst(loop_ws_child_states::MVIN_B, svs.loop_ws.child_state.bit_width()),
+                                                    BvConst(loop_ws_child_states::COMPUTE, svs.loop_ws.child_state.bit_width())));
+    get_sp_addrs.SetUpdate(svs.loop_ws.child_state, next_child_state);
+
+}
+
+
 
 }
 
