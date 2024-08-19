@@ -73,7 +73,17 @@ struct store_statevars_t {
 };
 
 
+struct tile_compute_args_t {
+    ExprRef addr = (ExprRef) NULL;
+    ExprRef rows = (ExprRef) NULL;
+    ExprRef cols = (ExprRef) NULL;
+};
 
+
+struct compute_args_t {
+    tile_compute_args_t a;
+    tile_compute_args_t bd;
+};
 
 struct execute_statevars_t {
     ExprRef dataflow      = (ExprRef) NULL;
@@ -96,22 +106,16 @@ struct execute_statevars_t {
     ExprRef ws_results     = (ExprRef) NULL;
     ExprRef child_state    = (ExprRef) NULL;
 
+    compute_args_t args;
+
     ExprRef i = (ExprRef) NULL;
     ExprRef j = (ExprRef) NULL;
     ExprRef k = (ExprRef) NULL;
 
+
 };
 
-struct tile_compute_args_t {
-    ExprRef addr = (ExprRef) NULL;
-    ExprRef rows = (ExprRef) NULL;
-    ExprRef cols = (ExprRef) NULL;
-};
 
-struct compute_args_t {
-    tile_compute_args_t a;
-    tile_compute_args_t bd;
-};
 
 struct loop_ws_statevars_t {
 

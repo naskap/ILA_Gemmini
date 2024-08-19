@@ -21,11 +21,11 @@ void DefineComputeMatmulInstruction(Ila& m, command_t& command, execute_statevar
 std:: string _BuildComputeMatmulInstrName(bool preload, dataflow_t dataflow);
 
 void DefinePreload(Ila &child, ExprRef &spad, execute_statevars_t &execute_statevars);
-void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &execute_statevars, tile_compute_args_t &bd_args);
-void DefineMatmulWS(Ila &child, ExprRef &spad, execute_statevars_t &execute_statevars, compute_args_t &compute_args);
-void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &execute_statevars, compute_args_t &compute_args);
+void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &execute_statevars);
+void DefineMatmulWS(Ila &child, ExprRef &spad, execute_statevars_t &execute_statevars);
+void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &execute_statevars);
 
-ExprRef _GetTileAElmt(ExprRef &spad, execute_statevars_t &execute_statevars, tile_compute_args_t &a_args, ExprRef &i_bv, ExprRef &k_bv);
+ExprRef _GetTileAElmt(ExprRef &spad, execute_statevars_t &execute_statevars, ExprRef &i_bv, ExprRef &k_bv);
 
 void DefineStoreOutputChild(Ila &m, command_t &command, execute_statevars_t &execute_statevars, gemmini_memory_t &memory);
 void DefineStoreOutputInstruction(Ila &store_output, execute_statevars_t &execute_statevars, 

@@ -39,6 +39,14 @@ void DefineExecuteStatevars(Ila& m, execute_statevars_t &svs){
     svs.ws_results.SetEntryNum(ARRAY_DIM);
     svs.child_state = m.NewBvState("child_state", 8);
 
+    // Compute args
+    svs.args.a.addr  = m.NewBvState("exec_a_addr", 32);
+    svs.args.bd.addr = m.NewBvState("exec_bd_addr", 32);
+    svs.args.a.cols  = m.NewBvState("exec_a_cols", 16);
+    svs.args.a.rows  = m.NewBvState("exec_a_rows", 16);
+    svs.args.bd.cols = m.NewBvState("exec_bd_cols", 16);
+    svs.args.bd.rows = m.NewBvState("exec_bd_rows", 16);
+
     // Compute child statevars
     svs.i = m.NewBvState("i", 32);
     svs.j = m.NewBvState("j", 32);
@@ -102,26 +110,23 @@ void DefineComputeMatmul(Ila& m, command_t& command, execute_statevars_t &svs, g
     compute_matmul.SetUpdate(svs.i, BvConst(0, 32));
     compute_matmul.SetUpdate(svs.j, BvConst(0, 32));
     compute_matmul.SetUpdate(svs.k, BvConst(0, 32));
+    compute_matmul.SetUpdate(svs.args.a.addr , Extract(command.rs1, 31, 0));
+    compute_matmul.SetUpdate(svs.args.bd.addr, Extract(command.rs2, 31, 0));
+    compute_matmul.SetUpdate(svs.args.a.cols , Extract(command.rs1, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH));
+    compute_matmul.SetUpdate(svs.args.a.rows , Extract(command.rs1, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16));
+    compute_matmul.SetUpdate(svs.args.bd.cols, Extract(command.rs2, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH));
+    compute_matmul.SetUpdate(svs.args.bd.rows, Extract(command.rs2, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16));
     // compute_matmul.SetUpdate(svs.ws_results, MemConst(0, std::map<uint64_t, uint64_t>(), SPAD_ADDRESS_WIDTH, ACC_ROW_WIDTH));
 
     // Declare child
     auto child = m.NewChild("compute_child");
     child.SetValid(svs.child_state != BvConst(compute_child_states::INACTIVE, 8));
 
-    // Extract command arguments
-    compute_args_t compute_args;
-    compute_args.a.addr  = Extract(command.rs1, 31, 0);
-    compute_args.bd.addr = Extract(command.rs2, 31, 0);
-    compute_args.a.cols  = Extract(command.rs1, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH);
-    compute_args.a.rows  = Extract(command.rs1, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16);
-    compute_args.bd.cols = Extract(command.rs2, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH);
-    compute_args.bd.rows = Extract(command.rs2, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16);
-
     // Define child instructions
     DefinePreload(child, memory.spad, svs);
-    DefineInitializeWSResults(child, memory.spad, svs, compute_args.bd);
-    DefineMatmulWS(child, memory.spad, svs, compute_args);
-    DefineMatmulOS(child, memory.spad, svs, compute_args);
+    DefineInitializeWSResults(child, memory.spad, svs);
+    DefineMatmulWS(child, memory.spad, svs);
+    DefineMatmulOS(child, memory.spad, svs);
     for(int dataflow = 0; dataflow <= 1; dataflow++){
         for(int acc_address = 0; acc_address <= 1; acc_address++){
             if(acc_address == 1){
@@ -188,7 +193,7 @@ void DefinePreload(Ila &child, ExprRef &spad, execute_statevars_t &svs){
 }
 
 
-void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &svs, tile_compute_args_t &bd_args){
+void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &svs){
     
     // Declare instruction
     auto init_ws_results = child.NewInstr("init_ws_results");
@@ -196,10 +201,10 @@ void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &s
 
     // Get seed element from spad
     auto bw         = svs.i.bit_width();
-    auto store_zero = (~bd_args.addr) == BvConst(0, 32) |
-                    ((svs.i >= bd_args.rows.ZExt(bw)) | (svs.j >= bd_args.cols.ZExt(bw)));
+    auto store_zero = (~svs.args.bd.addr) == BvConst(0, 32) |
+                    ((svs.i >= svs.args.bd.rows.ZExt(bw)) | (svs.j >= svs.args.bd.cols.ZExt(bw)));
     auto elmt   =  Ite(store_zero, BvConst(0, ACC_TYPE_WIDTH_BITS), 
-                GetMemElmt(spad, bd_args.addr + svs.i, svs.j, INPUT_TYPE_WIDTH_BITS).SExt(ACC_TYPE_WIDTH_BITS));
+                GetMemElmt(spad, svs.args.bd.addr + svs.i, svs.j, INPUT_TYPE_WIDTH_BITS).SExt(ACC_TYPE_WIDTH_BITS));
     
     // Store elemt
     auto ws_results_next = SetMemElmt(svs.ws_results, svs.i, svs.j, elmt);
@@ -221,13 +226,13 @@ void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &s
  
 }
 
-void DefineMatmulWS(Ila &child, ExprRef &spad, execute_statevars_t &svs, compute_args_t &compute_args){
+void DefineMatmulWS(Ila &child, ExprRef &spad, execute_statevars_t &svs){
     
     auto matmul_ws = child.NewInstr("matmul_ws");
     matmul_ws.SetDecode(svs.child_state == BvConst(compute_child_states::WS_COMPUTE,8));
     
     // Retrieve elements
-    auto a              = _GetTileAElmt(spad, svs, compute_args.a, svs.i, svs.k);
+    auto a              = _GetTileAElmt(spad, svs, svs.i, svs.k);
     auto sys_array_elmt = GetMemElmt(svs.systolic_array, svs.k, svs.j, ACC_TYPE_WIDTH_BITS);
     auto cur_elmt       = GetMemElmt(svs.ws_results, svs.i, svs.j, ACC_TYPE_WIDTH_BITS);
 
@@ -248,19 +253,19 @@ void DefineMatmulWS(Ila &child, ExprRef &spad, execute_statevars_t &svs, compute
 
 }
 
-void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &svs, compute_args_t &compute_args){
+void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &svs){
 
     auto matmul_os = child.NewInstr("matmul_os");
     matmul_os.SetDecode(svs.child_state == BvConst(compute_child_states::OS_COMPUTE,8));
 
-    auto a = _GetTileAElmt(spad, svs, compute_args.a, svs.i, svs.k);
+    auto a = _GetTileAElmt(spad, svs, svs.i, svs.k);
 
     // Get b tile element
     auto r          = Ite(svs.b_transpose, svs.j, svs.k);
     auto c          = Ite(svs.b_transpose, svs.k, svs.j);
-    auto store_zero = (~compute_args.bd.addr == 0) | ((svs.k >= compute_args.bd.rows.ZExt(svs.k.bit_width())) | (svs.j >= compute_args.bd.cols.ZExt(svs.j.bit_width())));
+    auto store_zero = (~svs.args.bd.addr == 0) | ((svs.k >= svs.args.bd.rows.ZExt(svs.k.bit_width())) | (svs.j >= svs.args.bd.cols.ZExt(svs.j.bit_width())));
     auto b          = Ite(store_zero, BvConst(0, INPUT_TYPE_WIDTH_BITS),
-                GetMemElmt(spad, compute_args.bd.addr + r.ZExt(spad.addr_width()), c, INPUT_TYPE_WIDTH_BITS));
+                GetMemElmt(spad, svs.args.bd.addr + r.ZExt(spad.addr_width()), c, INPUT_TYPE_WIDTH_BITS));
 
     // Accumulate into systolic array
     auto cur_elmt            = GetMemElmt(svs.systolic_array, svs.i, svs.j, ACC_TYPE_WIDTH_BITS);
@@ -280,14 +285,14 @@ void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &svs, compute
 
 }
 
-ExprRef _GetTileAElmt(ExprRef &spad, execute_statevars_t &svs, tile_compute_args_t &a_args, ExprRef &i_bv, ExprRef &k_bv){
+ExprRef _GetTileAElmt(ExprRef &spad, execute_statevars_t &svs, ExprRef &i_bv, ExprRef &k_bv){
     auto r = svs.a_stride.ZExt(i_bv.bit_width()) * (Ite(svs.a_transpose, k_bv, i_bv));
     auto c = Ite(svs.a_transpose, i_bv, k_bv);
     
     auto rand_num = BvConst(rand() % ((1 << INPUT_TYPE_WIDTH_BITS) - 1), INPUT_TYPE_WIDTH_BITS);
-    auto a        = Ite(~a_args.addr == 0, rand_num,
-                Ite((i_bv >= a_args.rows.ZExt(i_bv.bit_width())) | (k_bv >= a_args.cols.ZExt(k_bv.bit_width())), BvConst(0, INPUT_TYPE_WIDTH_BITS),
-                                                    GetMemElmt(spad, a_args.addr + r.ZExt(spad.addr_width()), c, INPUT_TYPE_WIDTH_BITS)));
+    auto a        = Ite(~svs.args.a.addr == 0, rand_num,
+                Ite((i_bv >= svs.args.a.rows.ZExt(i_bv.bit_width())) | (k_bv >= svs.args.a.cols.ZExt(k_bv.bit_width())), BvConst(0, INPUT_TYPE_WIDTH_BITS),
+                                                    GetMemElmt(spad, svs.args.a.addr + r.ZExt(spad.addr_width()), c, INPUT_TYPE_WIDTH_BITS)));
     return a;
 }
 
