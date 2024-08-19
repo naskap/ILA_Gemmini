@@ -29,6 +29,14 @@ void DefineStoreStateVars(Ila& m, store_statevars_t& store_statevars) {
     store_statevars.maxpool_params.out_rows          = m.NewBvState("store_maxpool_out_rows", 8);
     store_statevars.maxpool_params.out_cols          = m.NewBvState("store_maxpool_out_cols", 8);
 
+    // Store command args
+    store_statevars.num_rows = m.NewBvState("store_num_rows", 16);
+    store_statevars.num_cols = m.NewBvState("store_num_cols", 16);
+    store_statevars.soc_mem_base_address = m.NewBvState("store_soc_mem_base_address", 64);
+    store_statevars.is_acc_addr = m.NewBoolState("store_is_acc_addr");
+    store_statevars.read_acctype = m.NewBoolState("store_accumulate");
+    store_statevars.src_base_address = m.NewBvState("store_src_base_address", 29);
+
     // Store child helper variables
     store_statevars.child_valid = m.NewBoolState("store_child_valid");
     store_statevars.cur_row     = m.NewBvState("store_cur_row", 16);
@@ -73,6 +81,12 @@ void DefineStoreInstruction(Ila& m, command_t command, gemmini_memory_t memory,
     auto store = m.NewInstr("store");
     store.SetDecode(command.funct == STORE_CMD);
     store.SetUpdate(store_statevars.child_valid, BoolConst(true));
+    store.SetUpdate(store_statevars.soc_mem_base_address, command.rs1);
+    store.SetUpdate(store_statevars.is_acc_addr, Extract(command.rs2, 31,31) == 1);
+    store.SetUpdate(store_statevars.read_acctype, Extract(command.rs2, 29,29) == 1);
+    store.SetUpdate(store_statevars.src_base_address, Extract(command.rs2, 28,0));
+    store.SetUpdate(store_statevars.num_cols, Extract(command.rs2, 47, 32));
+    store.SetUpdate(store_statevars.num_rows, Extract(command.rs2, 63, 48));
     store.SetUpdate(store_statevars.cur_row, BvConst(0, 16));
     store.SetUpdate(store_statevars.cur_col, BvConst(0, 16));
     store.SetUpdate(store_statevars.cur_ch, BvConst(0, 16));
@@ -102,16 +116,6 @@ void DefineStoreChildInstruction(Ila& child,
                                 bool acctype,
                                 bool maxpool){
     
-    // Decode command fields
-    auto soc_mem_base_address = command.rs1;
-    auto is_acc_addr          = Extract(command.rs2, 31,31) == 1;
-    auto read_acctype         = Extract(command.rs2, 29,29) == 1;
-    auto src_base_address     = Extract(command.rs2, 28,0);
-    auto num_cols             = Extract(command.rs2, 47, 32);
-    auto num_rows             = Extract(command.rs2, 63, 48);
-    
-    
-
     // Declare instruction
     std::string instr_name = "store_row";
     if(from_accumulator){
@@ -133,8 +137,8 @@ void DefineStoreChildInstruction(Ila& child,
     auto store_elem = child.NewInstr(instr_name);
     
     // Decode
-    store_elem.SetDecode((is_acc_addr == BoolConst(from_accumulator)) 
-                        & (BoolConst(acctype) == read_acctype) 
+    store_elem.SetDecode((store_statevars.is_acc_addr == BoolConst(from_accumulator)) 
+                        & (BoolConst(acctype) == store_statevars.read_acctype) 
                         & ((store_statevars.maxpool_params.enable_and_stride != 0) == BoolConst(maxpool)));
 
 
@@ -142,10 +146,10 @@ void DefineStoreChildInstruction(Ila& child,
         maxpool_params_t maxp_params = store_statevars.maxpool_params;
         
         // Compute cur elmt indices
-        auto channels = num_cols;
+        auto channels = store_statevars.num_cols;
         auto orow     = store_statevars.cur_row.ZExt(32) * maxp_params.enable_and_stride.ZExt(32) + store_statevars.cur_wrow.ZExt(32) - maxp_params.upper_pad.ZExt(32);
         auto ocol     = store_statevars.cur_col.ZExt(32) * maxp_params.enable_and_stride.ZExt(32) + store_statevars.cur_wcol.ZExt(32) - maxp_params.left_pad.ZExt(32);
-        auto row_addr = src_base_address.ZExt(32) + orow* maxp_params.out_cols.ZExt(32) + ocol;
+        auto row_addr = store_statevars.src_base_address.ZExt(32) + orow* maxp_params.out_cols.ZExt(32) + ocol;
 
         // Compute whether cur element is in bounds
         auto cond_out_of_bounds = orow < BvConst(0,orow.bit_width()) | ocol < BvConst(0,ocol.bit_width()) | orow >= maxp_params.out_rows.ZExt(32) | ocol >= maxp_params.out_cols.ZExt(32);
@@ -185,10 +189,10 @@ void DefineStoreChildInstruction(Ila& child,
     }else{
 
         // Compute soc_mem_address (aka destination address)
-        auto store_elmt_size_bytes = Ite(read_acctype, BvConst(ACC_TYPE_WIDTH_BYTES,64), BvConst(INPUT_TYPE_WIDTH_BYTES, 64));
+        auto store_elmt_size_bytes = Ite(store_statevars.read_acctype, BvConst(ACC_TYPE_WIDTH_BYTES,64), BvConst(INPUT_TYPE_WIDTH_BYTES, 64));
         auto soc_mem_offset        = (ZExt(store_statevars.cur_row, 64)*store_statevars.stride.ZExt(64))
                                 + (store_elmt_size_bytes * ZExt(store_statevars.cur_col, 64));
-        auto soc_mem_address = soc_mem_base_address + soc_mem_offset;
+        auto soc_mem_address = store_statevars.soc_mem_base_address + soc_mem_offset;
 
 
         // Compute spad address
@@ -197,7 +201,7 @@ void DefineStoreChildInstruction(Ila& child,
         auto array_dim_bv      = BvConst(ARRAY_DIM, 16);
         auto block             = store_statevars.cur_col / array_dim_bv;
         auto spad_col          = store_statevars.cur_col - block * array_dim_bv;                                                            // Equiv to cur_col % ARRAY_DIM
-        auto spad_row          = src_base_address.ZExt(32) + ZExt(store_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(array_dim_bv, 32);
+        auto spad_row          = store_statevars.src_base_address.ZExt(32) + ZExt(store_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(array_dim_bv, 32);
     
         // Load data
         auto src_mem  = from_accumulator ?  memory.accumulator : memory.spad;
@@ -220,8 +224,8 @@ void DefineStoreChildInstruction(Ila& child,
         // Update state variables
         std::vector<ExprRef> iteration_vars = {store_statevars.cur_row, 
                                                 store_statevars.cur_col};
-        std::vector<ExprRef> iteration_maxs = {num_rows, 
-                                               num_cols};
+        std::vector<ExprRef> iteration_maxs = {store_statevars.num_rows, 
+                                               store_statevars.num_cols};
         
         auto last_pixel = IterateLoopVars(store_elem, iteration_vars, iteration_maxs);
         store_elem.SetUpdate(store_statevars.child_valid, !(last_pixel));

@@ -19,12 +19,20 @@ struct load_statevars_t {
   ExprRef scale          = (ExprRef)NULL;  // mvin scale (ignored if gemmini not configured with this ability)
   ExprRef read_inputType = (ExprRef)NULL;
   ExprRef pixels_per_row = (ExprRef)NULL;
+  ExprRef child_valid    = (ExprRef)NULL;
   
-  // Child ILA helpers
-  ExprRef child_valid = (ExprRef)NULL;
-  ExprRef cur_row     = (ExprRef)NULL;
-  ExprRef cur_col     = (ExprRef)NULL;
-  ExprRef cur_pixel   = (ExprRef)NULL;
+  // Command args (shared across configs)
+  ExprRef num_rows             = (ExprRef) NULL;
+  ExprRef num_cols             = (ExprRef) NULL;
+  ExprRef soc_mem_base_address = (ExprRef) NULL;
+  ExprRef acc_or_spad          = (ExprRef) NULL;
+  ExprRef accumulate           = (ExprRef) NULL;
+  ExprRef spad_base_address    = (ExprRef) NULL;
+
+  // Child ILA helpers (shared across configs)
+  ExprRef cur_row   = (ExprRef)NULL;
+  ExprRef cur_col   = (ExprRef)NULL;
+  ExprRef cur_pixel = (ExprRef)NULL;
 };
 
 
@@ -46,6 +54,15 @@ struct store_statevars_t {
   ExprRef activation = (ExprRef)NULL;
   maxpool_params_t maxpool_params;
 
+  //Command args
+  ExprRef num_rows             = (ExprRef) NULL;
+  ExprRef num_cols             = (ExprRef) NULL;
+  ExprRef soc_mem_base_address = (ExprRef) NULL;
+  ExprRef is_acc_addr          = (ExprRef) NULL;
+  ExprRef read_acctype         = (ExprRef) NULL;
+  ExprRef src_base_address     = (ExprRef) NULL;
+
+  // Helper variables
   ExprRef child_valid = (ExprRef) NULL;
   ExprRef cur_row     = (ExprRef) NULL;
   ExprRef cur_col     = (ExprRef) NULL;

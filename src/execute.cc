@@ -33,9 +33,9 @@ void DefineExecuteStatevars(Ila& m, execute_statevars_t &svs){
     svs.output_rows     = m.NewBvState("output_rows", 16);
 
     // Compute parent statevars
-    svs.systolic_array = m.NewMemState("systolic_array", SPAD_ADDRESS_WIDTH, ACC_ROW_WIDTH); 
+    svs.systolic_array = m.NewMemState("systolic_array", SPAD_ADDRESS_WIDTH, ACC_ROW_WIDTH);
     svs.systolic_array.SetEntryNum(ARRAY_DIM);
-    svs.ws_results = m.NewMemState("ws_results", SPAD_ADDRESS_WIDTH, ACC_ROW_WIDTH); 
+    svs.ws_results = m.NewMemState("ws_results", SPAD_ADDRESS_WIDTH, ACC_ROW_WIDTH);
     svs.ws_results.SetEntryNum(ARRAY_DIM);
     svs.child_state = m.NewBvState("child_state", 8);
 
@@ -88,7 +88,7 @@ void DefineComputeMatmul(Ila& m, command_t& command, execute_statevars_t &svs, g
     auto compute_matmul = m.NewInstr("compute_matmul");
 
     // Set decode
-    auto compute_preload = (command.funct == BvConst(COMPUTE_PRELOADED_CMD, INSTR_FUNCT_WIDTH));
+    auto compute_preload       = (command.funct == BvConst(COMPUTE_PRELOADED_CMD, INSTR_FUNCT_WIDTH));
     auto valid_compute_preload = compute_preload & (Extract(svs.preload_sp_addr, 31,30) == BvConst(0,2) | 
                                                     (~svs.preload_sp_addr == BvConst(0, 32)));
     auto compute_accumulated = (command.funct == BvConst(COMPUTE_ACCUMULATE_CMD, INSTR_FUNCT_WIDTH));
@@ -126,10 +126,10 @@ void DefineComputeMatmul(Ila& m, command_t& command, execute_statevars_t &svs, g
         for(int acc_address = 0; acc_address <= 1; acc_address++){
             if(acc_address == 1){
                 for(int accumulate_output = 0; accumulate_output <=1; accumulate_output++){
-                    DefineStoreOutputInstruction(child, command, svs, memory, dataflow_t(dataflow), acc_address, accumulate_output);
+                    DefineStoreOutputInstruction(child, svs, memory, dataflow_t(dataflow), acc_address, accumulate_output);
                 }
             }else{
-                DefineStoreOutputInstruction(child, command, svs, memory, dataflow_t(dataflow), acc_address, false);
+                DefineStoreOutputInstruction(child, svs, memory, dataflow_t(dataflow), acc_address, false);
             }
         }
     }
@@ -152,12 +152,12 @@ void DefinePreload(Ila &child, ExprRef &spad, execute_statevars_t &svs){
     preload.SetDecode(svs.child_state == BvConst(compute_child_states::PRELOAD,8));
 
     // Get preload value to set
-    auto preload_transpose = (svs.dataflow == BoolConst(dataflow_t::WS)) & svs.b_transpose;  
-    auto r = Ite(preload_transpose, svs.j, svs.i);
-    auto c = Ite(preload_transpose, svs.i, svs.j);
-    auto load_cur_elmt = (svs.i < svs.preload_rows.SExt(32)) & 
+    auto preload_transpose = (svs.dataflow == BoolConst(dataflow_t::WS)) & svs.b_transpose;
+    auto r                 = Ite(preload_transpose, svs.j, svs.i);
+    auto c                 = Ite(preload_transpose, svs.i, svs.j);
+    auto load_cur_elmt     = (svs.i < svs.preload_rows.SExt(32)) &
                          (svs.j < svs.preload_cols.SExt(32));
-    auto load_zero = ~svs.preload_sp_addr == 0;
+    auto load_zero     = ~svs.preload_sp_addr == 0;
     auto preload_value = Ite(!load_cur_elmt | load_zero, BvConst(0, INPUT_TYPE_WIDTH_BITS), 
                             GetMemElmt(spad, r + svs.preload_sp_addr, c, INPUT_TYPE_WIDTH_BITS));
                 
@@ -195,8 +195,8 @@ void DefineInitializeWSResults(Ila &child, ExprRef &spad, execute_statevars_t &s
     init_ws_results.SetDecode(svs.child_state == BvConst(compute_child_states::INITIALIZE_WS_RESULTS,8));
 
     // Get seed element from spad
-    auto bw = svs.i.bit_width();
-    auto store_zero = (~bd_args.addr) == BvConst(0, 32) | 
+    auto bw         = svs.i.bit_width();
+    auto store_zero = (~bd_args.addr) == BvConst(0, 32) |
                     ((svs.i >= bd_args.rows.ZExt(bw)) | (svs.j >= bd_args.cols.ZExt(bw)));
     auto elmt   =  Ite(store_zero, BvConst(0, ACC_TYPE_WIDTH_BITS), 
                 GetMemElmt(spad, bd_args.addr + svs.i, svs.j, INPUT_TYPE_WIDTH_BITS).SExt(ACC_TYPE_WIDTH_BITS));
@@ -227,9 +227,9 @@ void DefineMatmulWS(Ila &child, ExprRef &spad, execute_statevars_t &svs, compute
     matmul_ws.SetDecode(svs.child_state == BvConst(compute_child_states::WS_COMPUTE,8));
     
     // Retrieve elements
-    auto a =_GetTileAElmt(spad, svs, compute_args.a, svs.i, svs.k);
+    auto a              = _GetTileAElmt(spad, svs, compute_args.a, svs.i, svs.k);
     auto sys_array_elmt = GetMemElmt(svs.systolic_array, svs.k, svs.j, ACC_TYPE_WIDTH_BITS);
-    auto cur_elmt = GetMemElmt(svs.ws_results, svs.i, svs.j, ACC_TYPE_WIDTH_BITS);
+    auto cur_elmt       = GetMemElmt(svs.ws_results, svs.i, svs.j, ACC_TYPE_WIDTH_BITS);
 
     // Compute and store ws_results update
     auto ws_results_next = SetMemElmt(svs.ws_results, svs.i, svs.j, cur_elmt + a.SExt(ACC_TYPE_WIDTH_BITS) * sys_array_elmt);
@@ -256,22 +256,22 @@ void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &svs, compute
     auto a = _GetTileAElmt(spad, svs, compute_args.a, svs.i, svs.k);
 
     // Get b tile element
-    auto r = Ite(svs.b_transpose, svs.j, svs.k);
-    auto c = Ite(svs.b_transpose, svs.k, svs.j);
+    auto r          = Ite(svs.b_transpose, svs.j, svs.k);
+    auto c          = Ite(svs.b_transpose, svs.k, svs.j);
     auto store_zero = (~compute_args.bd.addr == 0) | ((svs.k >= compute_args.bd.rows.ZExt(svs.k.bit_width())) | (svs.j >= compute_args.bd.cols.ZExt(svs.j.bit_width())));
-    auto b = Ite(store_zero, BvConst(0, INPUT_TYPE_WIDTH_BITS),
+    auto b          = Ite(store_zero, BvConst(0, INPUT_TYPE_WIDTH_BITS),
                 GetMemElmt(spad, compute_args.bd.addr + r.ZExt(spad.addr_width()), c, INPUT_TYPE_WIDTH_BITS));
 
     // Accumulate into systolic array
-    auto cur_elmt = GetMemElmt(svs.systolic_array, svs.i, svs.j, ACC_TYPE_WIDTH_BITS);
-    auto to_store = cur_elmt + a.SExt(ACC_TYPE_WIDTH_BITS) * b.SExt(ACC_TYPE_WIDTH_BITS);
+    auto cur_elmt            = GetMemElmt(svs.systolic_array, svs.i, svs.j, ACC_TYPE_WIDTH_BITS);
+    auto to_store            = cur_elmt + a.SExt(ACC_TYPE_WIDTH_BITS) * b.SExt(ACC_TYPE_WIDTH_BITS);
     auto systolic_array_next = SetMemElmt(svs.systolic_array, svs.i, svs.j, to_store);
     matmul_os.SetUpdate(svs.systolic_array, systolic_array_next);
            
     // Update iteration variables
     std::vector<ExprRef> iteration_vars = {svs.i, svs.j, svs.k};
     std::vector<ExprRef> iteration_maxs = {BvConst(ARRAY_DIM, 32), BvConst(ARRAY_DIM, 32), BvConst(ARRAY_DIM, 32)};
-    auto last_pixel = IterateLoopVars(matmul_os, iteration_vars, iteration_maxs);
+    auto last_pixel                     = IterateLoopVars(matmul_os, iteration_vars, iteration_maxs);
     
     // Update next state
     auto child_state_next = Ite(last_pixel,  BvConst(compute_child_states::OUTPUT_RESULTS, 8),
@@ -285,7 +285,7 @@ ExprRef _GetTileAElmt(ExprRef &spad, execute_statevars_t &svs, tile_compute_args
     auto c = Ite(svs.a_transpose, i_bv, k_bv);
     
     auto rand_num = BvConst(rand() % ((1 << INPUT_TYPE_WIDTH_BITS) - 1), INPUT_TYPE_WIDTH_BITS);
-    auto a = Ite(~a_args.addr == 0, rand_num,
+    auto a        = Ite(~a_args.addr == 0, rand_num,
                 Ite((i_bv >= a_args.rows.ZExt(i_bv.bit_width())) | (k_bv >= a_args.cols.ZExt(k_bv.bit_width())), BvConst(0, INPUT_TYPE_WIDTH_BITS),
                                                     GetMemElmt(spad, a_args.addr + r.ZExt(spad.addr_width()), c, INPUT_TYPE_WIDTH_BITS)));
     return a;
@@ -293,7 +293,7 @@ ExprRef _GetTileAElmt(ExprRef &spad, execute_statevars_t &svs, tile_compute_args
 
 
 
-void DefineStoreOutputInstruction(Ila &store_child, command_t &command, execute_statevars_t &svs, 
+void DefineStoreOutputInstruction(Ila &store_child, execute_statevars_t &svs, 
                         gemmini_memory_t &memory, dataflow_t const &dataflow, bool acc_address, bool accumulate_output){
 
     // Disable invalid options
@@ -315,9 +315,9 @@ void DefineStoreOutputInstruction(Ila &store_child, command_t &command, execute_
                                               GetMemElmt(svs.ws_results, svs.i, svs.j, ACC_TYPE_WIDTH_BITS);
 
     auto base_sp_address = Extract(svs.output_sp_addr, 28,0).ZExt(32);
-    auto row_address = base_sp_address + svs.c_stride.ZExt(32) * svs.i;
+    auto row_address     = base_sp_address + svs.c_stride.ZExt(32) * svs.i;
 
-    auto shifted = dataflow == dataflow_t::OS ? _RoundingRightShift(value, svs.sys_shift) : 
+    auto shifted = dataflow == dataflow_t::OS ? _RoundingRightShift(value, svs.sys_shift) :
                                                     _RoundingRightShift(value, BvConst(0, value.bit_width()));
 
     if(acc_address){
@@ -327,7 +327,7 @@ void DefineStoreOutputInstruction(Ila &store_child, command_t &command, execute_
         auto acc_next = memory.accumulator;
         if(accumulate_output){
             auto cur_elmt = GetMemElmt(memory.accumulator, row_address, svs.j, ACC_TYPE_WIDTH_BITS);
-            acc_next = SetMemElmt(memory.accumulator, row_address, svs.j, cur_elmt + value);
+                 acc_next = SetMemElmt(memory.accumulator, row_address, svs.j, cur_elmt + value);
         } else{
             acc_next = SetMemElmt(memory.accumulator, row_address, svs.j, value);
         }
@@ -370,12 +370,12 @@ std::string _BuildStoreOutputInstrName(dataflow_t const &dataflow, bool acc_addr
 
 ExprRef _RoundingRightShift(ExprRef const &x, ExprRef const &shift){
     ILA_ASSERT(x.bit_width() == shift.bit_width()); // Can cast later if this becomes a nuisance
-    unsigned int bw = x.bit_width();
-    auto simple_shift = x >> shift;
-    auto msb_shifted_out = (x >> (shift - 1)) & BvConst(1, bw);
-    auto other_ones_shifted_out = Ite(((x) & ((BvConst(1, bw) << ((shift)-1)) - 1)) != 0, BvConst(1,bw), BvConst(0,bw)) ;
-    auto new_lsb_is_one = (simple_shift & BvConst(1, bw));
-    auto round_factor = Ite(shift <= 1, BvConst(0, x.bit_width()), 
+    unsigned int bw                 = x.bit_width();
+    auto     simple_shift           = x >> shift;
+    auto     msb_shifted_out        = (x >> (shift - 1)) & BvConst(1, bw);
+    auto     other_ones_shifted_out = Ite(((x) & ((BvConst(1, bw) << ((shift)-1)) - 1)) != 0, BvConst(1,bw), BvConst(0,bw)) ;
+    auto     new_lsb_is_one         = (simple_shift & BvConst(1, bw));
+    auto     round_factor           = Ite(shift <= 1, BvConst(0, x.bit_width()), 
                                 msb_shifted_out & (other_ones_shifted_out | new_lsb_is_one));
     return simple_shift + round_factor;
 }

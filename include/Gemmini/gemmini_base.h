@@ -92,7 +92,7 @@ enum Activation {NONE, ReLU};
 Ila GetGemminiIla(const std::string& model_name = "Gemmini");
 static void DefineCommand(Ila &m, command_t *c);
 static void DefineMemory(Ila &m, gemmini_memory_t *mem);
-extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory, load_statevars_t *load_statevars_t);
+extern void DefineLoad(Ila& m, command_t& command, gemmini_memory_t memory, load_statevars_t load_statevars_t[NUM_MVIN_CONFIG_SETS]);
 extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory, store_statevars_t &store_statevars);
 extern void DefineExecute(Ila& m, command_t& command, gemmini_memory_t memory, execute_statevars_t &execute_statevars);
 extern void DefineLoopWS(Ila& m, command_t& command, gemmini_memory_t memory, gemmini_statevars_t &svs);

@@ -16,26 +16,37 @@ void DefineLoadStateVars(Ila& m, load_statevars_t load_statevars[NUM_MVIN_CONFIG
   for (int i = 0; i < NUM_MVIN_CONFIG_SETS; i++) {
 
     // Load configs
-    load_statevars[i].src_stride = 
-        m.NewBvState("load" + std::to_string(i) + "_src_stride", 64);
-    load_statevars[i].dest_stride = 
-        m.NewBvState("load" + std::to_string(i) + "_dest_stride", 16);
-    load_statevars[i].scale = 
-        m.NewBvState("load" + std::to_string(i) + "_scale", 32);
-    load_statevars[i].read_inputType = 
-        m.NewBoolState("load" + std::to_string(i) + "_read_inputType");
-    load_statevars[i].pixels_per_row = 
-        m.NewBvState("load" + std::to_string(i) + "_pixels_per_row", 8);
+    load_statevars[i].src_stride     = m.NewBvState("load" + std::to_string(i) + "_src_stride", 64);
+    load_statevars[i].dest_stride    = m.NewBvState("load" + std::to_string(i) + "_dest_stride", 16);
+    load_statevars[i].scale          = m.NewBvState("load" + std::to_string(i) + "_scale", 32);
+    load_statevars[i].read_inputType = m.NewBoolState("load" + std::to_string(i) + "_read_inputType");
+    load_statevars[i].pixels_per_row = m.NewBvState("load" + std::to_string(i) + "_pixels_per_row", 8);
+    load_statevars[i].child_valid    = m.NewBoolState("load" + std::to_string(i) + "_child_valid");
+    
+    // Shared state variables -- declare only one state variable for each config
+    if(i == 0){
+        load_statevars[i].num_rows             = m.NewBvState("load_rows", 16);
+        load_statevars[i].num_cols             = m.NewBvState("load_cols", 16);
+        load_statevars[i].soc_mem_base_address = m.NewBvState("load_soc_mem_base_addr", 64);
+        load_statevars[i].acc_or_spad          = m.NewBoolState("load_acc_or_spad");
+        load_statevars[i].accumulate           = m.NewBoolState("load_accumulate");
+        load_statevars[i].spad_base_address    = m.NewBvState("load_spad_base_addr", 29);
+        load_statevars[i].cur_row              = m.NewBvState("load_cur_row", 16);
+        load_statevars[i].cur_col              = m.NewBvState("load_cur_col", 16);
+        load_statevars[i].cur_pixel            = m.NewBvState("load_cur_pixel", 8);
+    }else{ 
+        load_statevars[i].num_rows             = load_statevars[0].num_rows;
+        load_statevars[i].num_cols             = load_statevars[0].num_cols;
+        load_statevars[i].soc_mem_base_address = load_statevars[0].soc_mem_base_address;
+        load_statevars[i].acc_or_spad          = load_statevars[0].acc_or_spad;
+        load_statevars[i].accumulate           = load_statevars[0].accumulate;
+        load_statevars[i].spad_base_address    = load_statevars[0].spad_base_address;
+        load_statevars[i].cur_row              = load_statevars[0].cur_row;
+        load_statevars[i].cur_col              = load_statevars[0].cur_col;
+        load_statevars[i].cur_pixel            = load_statevars[0].cur_pixel;
 
-    // Load child helper variables
-    load_statevars[i].child_valid = 
-        m.NewBoolState("load" + std::to_string(i) + "_child_valid");
-    load_statevars[i].cur_row = 
-        m.NewBvState("load" + std::to_string(i) + "_cur_row", 16);
-    load_statevars[i].cur_col = 
-        m.NewBvState("load" + std::to_string(i) + "_cur_col", 16);
-    load_statevars[i].cur_pixel = 
-        m.NewBvState("load" + std::to_string(i) + "_cur_pixel", 8);
+    }
+
   }
 }
 
@@ -80,6 +91,13 @@ void DefineLoadInstructions(Ila& m, command_t command, gemmini_memory_t memory,
     load[i].SetUpdate(load_statevars[i].cur_col, BvConst(0, 16));
     load[i].SetUpdate(load_statevars[i].cur_pixel, BvConst(0, 16));
     
+    load[i].SetUpdate(load_statevars[i].num_rows            , Extract(command.rs2, 63, 48));
+    load[i].SetUpdate(load_statevars[i].num_cols            , Extract(command.rs2, 47, 32));
+    load[i].SetUpdate(load_statevars[i].soc_mem_base_address, command.rs1);
+    load[i].SetUpdate(load_statevars[i].acc_or_spad         , SelectBit(command.rs2, 31) == 1);
+    load[i].SetUpdate(load_statevars[i].accumulate          , SelectBit(command.rs2, 30) == 1);
+    load[i].SetUpdate(load_statevars[i].spad_base_address   , Extract(command.rs2, 28, 0));
+    
     // Define child ILA
     children[i] = m.NewChild("load" + std::to_string(i));
     children[i].SetValid(load_statevars[i].child_valid == 1);
@@ -112,21 +130,16 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
 
     // Decode instruction
     if(is_acc_addr){
-        load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)) &
+        load_elem.SetDecode((load_statevars.acc_or_spad == BoolConst(is_acc_addr)) &
                         (load_statevars.read_inputType == BoolConst(read_inputtype)) &
-                        (Extract(command.rs2, 30, 30) == BvConst(accumulate,1))); 
+                        (load_statevars.accumulate == BoolConst(accumulate))); 
     }else{
         load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)));
     }
     
-    // Extract command args
-    auto num_rows = Extract(command.rs2,63,48);
-    auto num_cols = Extract(command.rs2,47,32);
-    auto soc_mem_base_address = command.rs1;
-    auto spad_base_addr = Extract(command.rs2, 28, 0);
 
     // Load soc mem (src) elmt
-    auto src_elmt = _GetSrcElmt(memory.soc_mem, soc_mem_base_address, load_statevars, read_inputtype);
+    auto src_elmt = _GetSrcElmt(memory.soc_mem, load_statevars.soc_mem_base_address, load_statevars, read_inputtype);
 
     // Scale and cast src elmt
     if(read_inputtype){
@@ -138,19 +151,19 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
 
     // Store src_elmt into spad/accumulator
     _StoreSrcElmt(load_elem, memory, load_statevars,
-                spad_base_addr, num_cols, src_elmt, 
+                load_statevars.spad_base_address, load_statevars.num_cols, src_elmt, 
                 is_acc_addr, read_inputtype, accumulate);
 
     
     // Iterate loop variables
     std::vector<ExprRef> iteration_vars = {load_statevars.cur_row, load_statevars.cur_col, load_statevars.cur_pixel};
-    std::vector<ExprRef> iteration_maxs = {num_rows, num_cols, load_statevars.pixels_per_row};
+    std::vector<ExprRef> iteration_maxs = {load_statevars.num_rows, load_statevars.num_cols, load_statevars.pixels_per_row};
     auto last_pixel                     = IterateLoopVars(load_elem, iteration_vars, iteration_maxs);
     load_elem.SetUpdate(load_statevars.child_valid, !(last_pixel));
 }
 
 std::string _BuildInstrName(int load_num, bool is_acc_addr, bool read_inputtype, bool accumulate){
-    std::string instr_name;
+    std:: string instr_name;
     if(is_acc_addr){
         std::string inputtype      = read_inputtype  ? "inputtype": "acctype";
         std::string load_operation = accumulate ? "accumulate" : "overwrite";
@@ -163,12 +176,12 @@ std::string _BuildInstrName(int load_num, bool is_acc_addr, bool read_inputtype,
 }
 
 ExprRef _GetSrcElmt(ExprRef soc_mem, ExprRef soc_mem_base_address,load_statevars_t &load_statevars, bool read_inputtype){
-    int  src_elmt_size    = read_inputtype ? INPUT_TYPE_WIDTH_BYTES : ACC_TYPE_WIDTH_BYTES;
+    int  src_elmt_size  = read_inputtype ? INPUT_TYPE_WIDTH_BYTES : ACC_TYPE_WIDTH_BYTES;
     auto soc_mem_offset = ZExt(load_statevars.cur_row, 64)
                         * load_statevars.src_stride 
                         + BvConst(src_elmt_size, 64) * ZExt(load_statevars.cur_col, 64);
     auto soc_mem_addr = soc_mem_base_address + soc_mem_offset;
-    auto src_elmt = Ite(soc_mem_addr == 0, BvConst(0, src_elmt_size * 8),
+    auto src_elmt     = Ite(soc_mem_addr == 0, BvConst(0, src_elmt_size * 8),
                         LoadMulti(soc_mem, soc_mem_addr, src_elmt_size));
     return src_elmt;
 }
@@ -183,16 +196,16 @@ void _StoreSrcElmt(InstrRef &load_elem,
                    bool accumulate){
 
     // Compute dest row and col
-    auto block            = load_statevars.cur_col / BvConst(ARRAY_DIM,16);
-    auto spad_col         = load_statevars.cur_col - block * BvConst(ARRAY_DIM, 16); // represents base row/col of diagonal load                                                    // Equiv to cur_col % ARRAY_DIM
-    auto spad_row         = spad_base_addr.ZExt(32) + ZExt(load_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(load_statevars.dest_stride, 32);
+    auto block    = load_statevars.cur_col / BvConst(ARRAY_DIM,16);
+    auto spad_col = load_statevars.cur_col - block * BvConst(ARRAY_DIM, 16);                                                              // represents base row/col of diagonal load                                                    // Equiv to cur_col % ARRAY_DIM
+    auto spad_row = spad_base_addr.ZExt(32) + ZExt(load_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(load_statevars.dest_stride, 32);
     auto dest_row = spad_row - ZExt(load_statevars.cur_pixel, 32);
     auto dest_col = spad_col + load_statevars.cur_pixel.ZExt(16) * num_cols;
     
     // Store/accumulate
     auto dest_mem = is_acc_addr ? memory.accumulator : memory.spad;
     if(accumulate){
-        auto cur_elmt = GetMemElmt(dest_mem, dest_row, dest_col, ACC_TYPE_WIDTH_BITS);
+        auto cur_elmt      = GetMemElmt(dest_mem, dest_row, dest_col, ACC_TYPE_WIDTH_BITS);
         auto dest_mem_next = SetMemElmt(dest_mem, dest_row, dest_col, cur_elmt + src_elmt);
         load_elem.SetUpdate(dest_mem, dest_mem_next);
     }else{

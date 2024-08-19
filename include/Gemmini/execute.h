@@ -29,7 +29,7 @@ void DefineMatmulOS(Ila &child, ExprRef &spad, execute_statevars_t &execute_stat
 ExprRef _GetTileAElmt(ExprRef &spad, execute_statevars_t &execute_statevars, tile_compute_args_t &a_args, ExprRef &i_bv, ExprRef &k_bv);
 
 void DefineStoreOutputChild(Ila &m, command_t &command, execute_statevars_t &execute_statevars, gemmini_memory_t &memory);
-void DefineStoreOutputInstruction(Ila &store_output, command_t &command, execute_statevars_t &execute_statevars, 
+void DefineStoreOutputInstruction(Ila &store_output, execute_statevars_t &execute_statevars, 
                         gemmini_memory_t &memory, dataflow_t const &dataflow, bool acc_address, bool accumulate_output);
 std::string _BuildStoreOutputInstrName(dataflow_t const &dataflow, bool acc_address, bool accumulate_output);
 ExprRef _RoundingRightShift(ExprRef const &x, ExprRef const &shift);
