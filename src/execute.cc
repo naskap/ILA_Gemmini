@@ -8,7 +8,7 @@ void DefineExecute(Ila& m, command_t& command, gemmini_memory_t memory, execute_
 
     DefineExecuteStatevars(m, svs);
     DefineConfigExecute(m, command, svs);
-    DefineMatmulPreload(m, command, svs);
+    DefineConfigPreload(m, command, svs);
     
     DefineComputeMatmul(m, command, svs, memory);
 }
@@ -65,20 +65,20 @@ void DefineConfigExecute(Ila& m, command_t& command, execute_statevars_t &svs){
     config_ex.SetUpdate(svs.a_stride, Extract(command.rs1, 31, 16));
 }
 
-void DefineMatmulPreload(Ila& m, command_t& command, execute_statevars_t &svs){
+void DefineConfigPreload(Ila& m, command_t& command, execute_statevars_t &svs){
     // Declare instruction
-    auto matmul_preload = m.NewInstr("matmul_preload");
+    auto config_preload = m.NewInstr("config_preload");
 
     // Define decode
-    matmul_preload.SetDecode(command.funct == BvConst(PRELOAD_CMD, INSTR_FUNCT_WIDTH));
+    config_preload.SetDecode(command.funct == BvConst(PRELOAD_CMD, INSTR_FUNCT_WIDTH));
 
     // Define update
-    matmul_preload.SetUpdate(svs.preload_sp_addr, Extract(command.rs1, 31, 0));
-    matmul_preload.SetUpdate(svs.output_sp_addr, Extract(command.rs2, 31, 0));
-    matmul_preload.SetUpdate(svs.preload_cols, Extract(command.rs1, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH));
-    matmul_preload.SetUpdate(svs.preload_rows, Extract(command.rs1, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16));
-    matmul_preload.SetUpdate(svs.output_cols, Extract(command.rs2, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH));
-    matmul_preload.SetUpdate(svs.output_rows, Extract(command.rs2, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16));
+    config_preload.SetUpdate(svs.preload_sp_addr, Extract(command.rs1, 31, 0));
+    config_preload.SetUpdate(svs.output_sp_addr, Extract(command.rs2, 31, 0));
+    config_preload.SetUpdate(svs.preload_cols, Extract(command.rs1, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH));
+    config_preload.SetUpdate(svs.preload_rows, Extract(command.rs1, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16));
+    config_preload.SetUpdate(svs.output_cols, Extract(command.rs2, SPAD_ADDRESS_WIDTH + 15, SPAD_ADDRESS_WIDTH));
+    config_preload.SetUpdate(svs.output_rows, Extract(command.rs2, SPAD_ADDRESS_WIDTH + 31, SPAD_ADDRESS_WIDTH + 16));
 
 }
 

@@ -10,9 +10,8 @@ enum compute_child_states {INACTIVE, PRELOAD, INITIALIZE_WS_RESULTS, WS_COMPUTE,
 
 
 void DefineExecuteStatevars(Ila& m, execute_statevars_t &execute_statevars);
-void DefineMatmulPreload(Ila& m, command_t& command, execute_statevars_t &execute_statevars);
+void DefineConfigPreload(Ila& m, command_t& command, execute_statevars_t &execute_statevars);
 void DefineConfigExecute(Ila& m, command_t& command, execute_statevars_t &execute_statevars);
-void DefineMatmulPreload(Ila& m, command_t& command, execute_statevars_t &execute_statevars);
 void DefineComputeMatmul(Ila& m, command_t& command, execute_statevars_t &execute_statevars, 
                         gemmini_memory_t memory);
 
