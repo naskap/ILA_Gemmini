@@ -144,7 +144,7 @@ void DefineLoopWSInstruction(Ila &m, command_t &command, gemmini_statevars_t &sv
     child.SetValid((svs.loop_ws.child_state != loop_ws_child_states::INACTIVE) & (svs.load[0].child_valid == false) & (svs.store.child_valid == false) & (svs.exec.child_state == 0));
     DefineLoadD(child, svs);
     DefineGetSPAddrs(child, svs);
-    // DefineMvinA(child, svs);
+    DefineMvinA(child, svs);
     // DefineMvinB(child, svs);
     // DefineCompute(child, svs);
     // DefineMvoutC(child, svs);
@@ -212,6 +212,38 @@ void DefineGetSPAddrs(Ila &child, gemmini_statevars_t &svs){
     get_sp_addrs.SetUpdate(svs.loop_ws.child_state, next_child_state);
 
 }
+
+void DefineMvinA(Ila &child, gemmini_statevars_t &svs){
+
+    auto mvin_a = child.NewInstr("loop_ws_mvin_a");
+    mvin_a.SetDecode(svs.loop_ws.child_state == loop_ws_child_states::MVIN_A);
+
+    auto a_row      = Ite(svs.loop_ws.a_transpose, svs.loop_ws.k, svs.loop_ws.i).ZExt(64);
+    auto a_col      = Ite(svs.loop_ws.a_transpose, svs.loop_ws.i, svs.loop_ws.k).ZExt(64);
+    auto a_num_rows = Ite(svs.loop_ws.a_transpose, svs.loop_ws.K, svs.loop_ws.I).ZExt(64);
+    auto a_num_cols = Ite(svs.loop_ws.a_transpose, svs.loop_ws.I, svs.loop_ws.K).ZExt(64);
+    
+    auto dram_addr = svs.loop_ws.A + (a_row * svs.loop_ws.A_stride + svs.loop_ws.i.ZExt(64)) * ARRAY_DIM * INPUT_TYPE_WIDTH_BYTES;
+    
+    auto col_dim_pad = Ite(svs.loop_ws.a_transpose, svs.loop_ws.pad_I, svs.loop_ws.pad_K);
+    auto pad_cols = Ite(a_col == a_num_cols - 1, col_dim_pad, BvConst(0, 16));
+    auto cols = BvConst(ARRAY_DIM, 16) - pad_cols;
+
+    auto row_dim_pad = Ite(svs.loop_ws.a_transpose, svs.loop_ws.pad_K, svs.loop_ws.pad_I);
+    auto pad_rows = Ite(a_row == a_num_rows - 1, row_dim_pad, BvConst(0, 16));
+    auto rows = BvConst(ARRAY_DIM, 16) - pad_rows;
+
+    _CallMvin(mvin_a, svs.load[0], dram_addr, svs.loop_ws.A_sp_addr, rows, cols);
+
+    auto next_child_state = Ite(svs.loop_ws.i == 0, BvConst(loop_ws_child_states::MVIN_B, svs.loop_ws.child_state.bit_width()),
+                                                    BvConst(loop_ws_child_states::COMPUTE, svs.loop_ws.child_state.bit_width()));
+    mvin_a.SetUpdate(svs.loop_ws.child_state, next_child_state);
+}
+
+// void DefineMvinB(Ila &child, gemmini_statevars_t &svs);
+// void DefineCompute(Ila &child, gemmini_statevars_t &svs);
+// void DefineMvoutC(Ila &child, gemmini_statevars_t &svs);
+// void DefineIterate(Ila &child, gemmini_statevars_t &svs);
 
 
 
