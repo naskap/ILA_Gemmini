@@ -74,6 +74,8 @@ void DefineConfigLoadInstructions(Ila& m, command_t command,
     config_load[i].SetUpdate(load_statevars[i].pixels_per_row, pixels_per_row_zero_is_one);
     
   }
+
+  free(config_load);
 }
 
 void DefineLoadInstructions(Ila& m, command_t command, gemmini_memory_t memory,

@@ -114,9 +114,45 @@ struct compute_args_t {
 };
 
 struct loop_ws_statevars_t {
-    ExprRef i = (ExprRef) NULL;
-    ExprRef j = (ExprRef) NULL;
-    ExprRef k = (ExprRef) NULL;
+
+    // Configs
+    ExprRef I        = (ExprRef) NULL;
+    ExprRef J        = (ExprRef) NULL;
+    ExprRef K        = (ExprRef) NULL;
+    ExprRef pad_I    = (ExprRef) NULL;
+    ExprRef pad_J    = (ExprRef) NULL;
+    ExprRef pad_K    = (ExprRef) NULL;
+    ExprRef A        = (ExprRef) NULL;
+    ExprRef B        = (ExprRef) NULL;
+    ExprRef D        = (ExprRef) NULL;
+    ExprRef C        = (ExprRef) NULL;
+    ExprRef A_stride = (ExprRef) NULL;
+    ExprRef B_stride = (ExprRef) NULL;
+    ExprRef D_stride = (ExprRef) NULL;
+    ExprRef C_stride = (ExprRef) NULL;
+
+    // Command args
+    ExprRef ex_accumulate = (ExprRef) NULL;
+    ExprRef full_C        = (ExprRef) NULL;
+    ExprRef low_D         = (ExprRef) NULL;
+    ExprRef act           = (ExprRef) NULL;
+    ExprRef a_transpose   = (ExprRef) NULL;
+    ExprRef b_transpose   = (ExprRef) NULL;
+
+    // Helpers
+    ExprRef i               = (ExprRef) NULL;
+    ExprRef j               = (ExprRef) NULL;
+    ExprRef k               = (ExprRef) NULL;
+    ExprRef A_sp_addr_start = (ExprRef) NULL;
+    ExprRef B_sp_addr_start = (ExprRef) NULL;
+    ExprRef D_sp_addr_start = (ExprRef) NULL;
+    ExprRef C_sp_addr_start = (ExprRef) NULL;
+    ExprRef A_sp_addr       = (ExprRef) NULL;
+    ExprRef B_sp_addr       = (ExprRef) NULL;
+    ExprRef D_sp_addr       = (ExprRef) NULL;
+    ExprRef C_sp_addr       = (ExprRef) NULL;
+    ExprRef child_state     = (ExprRef) NULL;
+
 };
 
 struct gemmini_statevars_t {
