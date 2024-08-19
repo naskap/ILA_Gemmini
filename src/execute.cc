@@ -120,7 +120,7 @@ void DefineComputeMatmul(Ila& m, command_t& command, execute_statevars_t &svs, g
 
     // Declare child
     auto child = m.NewChild("compute_child");
-    child.SetValid(svs.child_state != BvConst(compute_child_states::INACTIVE, 8));
+    child.SetValid(svs.child_state != BvConst(compute_child_states::COMPUTE_INACTIVE, 8));
 
     // Define child instructions
     DefinePreload(child, memory.spad, svs);
@@ -356,7 +356,7 @@ void DefineStoreOutputInstruction(Ila &store_child, execute_statevars_t &svs,
     auto last_pixel = IterateLoopVars(store_output, iteration_vars, iteration_maxs);
     
     // Update next state
-    auto child_state_next = Ite(last_pixel,  BvConst(compute_child_states::INACTIVE, 8),
+    auto child_state_next = Ite(last_pixel,  BvConst(compute_child_states::COMPUTE_INACTIVE, 8),
                                 BvConst(compute_child_states::OUTPUT_RESULTS, 8));
     store_output.SetUpdate(svs.child_state, child_state_next);
 

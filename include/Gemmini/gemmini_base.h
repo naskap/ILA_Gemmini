@@ -91,6 +91,15 @@ struct gemmini_memory_t{
 
 enum Activation {NONE, ReLU};
 
+enum compute_child_states {
+  COMPUTE_INACTIVE, 
+  PRELOAD, 
+  INITIALIZE_WS_RESULTS, 
+  WS_COMPUTE, 
+  OS_COMPUTE, 
+  OUTPUT_RESULTS
+};
+
 
 Ila GetGemminiIla(const std::string& model_name = "Gemmini");
 static void DefineCommand(Ila &m, command_t *c);
