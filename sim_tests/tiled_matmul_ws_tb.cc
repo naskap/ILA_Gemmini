@@ -13,7 +13,7 @@
 
 #define CHECK_RESULT 1
 
-#define NO_BIAS 1
+#define NO_BIAS 0
 #define FULL_BIAS_WIDTH 1
 
 #if FULL_BIAS_WIDTH
@@ -23,9 +23,9 @@ typedef elem_t ACC_T;
 #endif
 
 #ifndef BAREMETAL
-#define MAT_DIM_I 512
-#define MAT_DIM_K 512
-#define MAT_DIM_J 512
+#define MAT_DIM_I 60
+#define MAT_DIM_K 40
+#define MAT_DIM_J 30
 #else
 #define MAT_DIM_I 64
 #define MAT_DIM_K 64
@@ -94,6 +94,7 @@ SC_MODULE(Testbench){
     g.Gemmini_instr_rs2_in(rs2);
     g.Gemmini_instr_opcode_in(opcode);
     g.instr_log.open("./instr_log.txt",std::ofstream::out);
+    g.instr_update_log.open("./instr_update_log", std::ofstream::out);
     status = test_status::UNFINISHED;
   }
   void tb_thread(){

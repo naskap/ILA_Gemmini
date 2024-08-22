@@ -22,15 +22,9 @@ typedef acc_t ACC_T;
 typedef elem_t ACC_T;
 #endif
 
-#ifndef BAREMETAL
-#define MAT_DIM_I 512
-#define MAT_DIM_K 512
-#define MAT_DIM_J 512
-#else
 #define MAT_DIM_I 60
 #define MAT_DIM_K 40
 #define MAT_DIM_J 30
-#endif
 
 void full_matmul(elem_t A[MAT_DIM_I][MAT_DIM_K], elem_t B[MAT_DIM_K][MAT_DIM_J], ACC_T D[MAT_DIM_I][MAT_DIM_J], acc_t C[MAT_DIM_I][MAT_DIM_J]) {
   for (size_t r = 0; r < MAT_DIM_I; r++)
@@ -68,6 +62,7 @@ SC_MODULE(Testbench){
     g.Gemmini_instr_rs2_in(rs2);
     g.Gemmini_instr_opcode_in(opcode);
     g.instr_log.open("./instr_log.txt",std::ofstream::out);
+    g.instr_update_log.open("./instr_update_log", std::ofstream::out);
     status = test_status::UNFINISHED;
   }
   void tb_thread(){

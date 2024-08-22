@@ -22,15 +22,10 @@ typedef acc_t ACC_T;
 typedef elem_t ACC_T;
 #endif
 
-#ifndef BAREMETAL
-#define MAT_DIM_I 500
-#define MAT_DIM_K 400
-#define MAT_DIM_J 300
-#else
+
 #define MAT_DIM_I 60
 #define MAT_DIM_K 40
 #define MAT_DIM_J 30
-#endif
 
 void print_tile(elem_t* in, int tile_dim) {
   for (size_t r = 0; r < tile_dim; r++) {
@@ -94,6 +89,7 @@ SC_MODULE(Testbench){
     g.Gemmini_instr_rs2_in(rs2);
     g.Gemmini_instr_opcode_in(opcode);
     g.instr_log.open("./instr_log.txt",std::ofstream::out);
+    g.instr_update_log.open("./instr_update_log", std::ofstream::out);
     status = test_status::UNFINISHED;
   }
   void tb_thread(){

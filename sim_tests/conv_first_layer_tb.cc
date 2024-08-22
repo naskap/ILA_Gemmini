@@ -180,6 +180,7 @@ SC_MODULE(Testbench){
     g.Gemmini_instr_rs2_in(rs2);
     g.Gemmini_instr_opcode_in(opcode);
     g.instr_log.open("./instr_log.txt",std::ofstream::out);
+    g.instr_update_log.open("./instr_update_log", std::ofstream::out);
     status = test_status::UNFINISHED;
   }
   void tb_thread(){
