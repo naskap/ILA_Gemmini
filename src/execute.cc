@@ -37,7 +37,7 @@ void DefineExecuteStatevars(Ila& m, execute_statevars_t &svs){
     svs.systolic_array.SetEntryNum(ARRAY_DIM);
     svs.ws_results = m.NewMemState("ws_results", SPAD_ADDRESS_WIDTH, ACC_ROW_WIDTH);
     svs.ws_results.SetEntryNum(ARRAY_DIM);
-    svs.child_state = m.NewBvState("child_state", 8);
+    svs.child_state = m.NewBvState("execute_child_state", 8);
 
     // Compute args
     svs.args.a.addr  = m.NewBvState("exec_a_addr", 32);
@@ -48,9 +48,9 @@ void DefineExecuteStatevars(Ila& m, execute_statevars_t &svs){
     svs.args.bd.rows = m.NewBvState("exec_bd_rows", 16);
 
     // Compute child statevars
-    svs.i = m.NewBvState("i", 32);
-    svs.j = m.NewBvState("j", 32);
-    svs.k = m.NewBvState("k", 32);
+    svs.i = m.NewBvState("exec_i", 32);
+    svs.j = m.NewBvState("exec_j", 32);
+    svs.k = m.NewBvState("exec_k", 32);
 }
 
 

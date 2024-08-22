@@ -198,13 +198,14 @@ static acc_scale_t_bits acc_scale_t_to_acc_scale_t_bits(acc_scale_t x) {
 
 #define mvin_src_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && g.Gemmini_load0_read_inputType == 0) ? 4 : 1)
 
-void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows){
+void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows, unsigned int load_num){
   if(dram_addr == NULL)
     return;
   
+  unsigned int stride = load_num == 0 ? g.Gemmini_load0_src_stride.to_int() : load_num == 1 ? g.Gemmini_load1_src_stride.to_int() : g.Gemmini_load2_src_stride.to_int();
   for(int row=0;row < rows; row++){ 
     for(int col=0; col < cols; col++){ 
-      int8_t *elmt_address = ((int8_t *) dram_addr) + row * g.Gemmini_load0_src_stride.to_int() + col * mvin_src_elmt_size_bytes(spad_addr);
+      int8_t *elmt_address = ((int8_t *) dram_addr) + row * stride + col * mvin_src_elmt_size_bytes(spad_addr);
       for(int i = 0; i < mvin_src_elmt_size_bytes(spad_addr); i++){
         int8_t *byte_address = elmt_address + i;
         sc_biguint<8> data = *(byte_address);
@@ -218,7 +219,7 @@ void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned i
 // mvin and mvout
 #define gemmini_extended_mvin(dram_addr, spad_addr, cols, rows) \
   { \
-  move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows); \
+  move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows, 0); \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN) \
   } \
 
@@ -714,12 +715,115 @@ static void sp_tiled_matmul_ws(const elem_t * A, const elem_t * B,
   }
 */
 
+  const uint32_t A_sp_addr_start = 0;
+  const uint32_t B_sp_addr_start = (BANK_NUM * BANK_ROWS / 2) - K * J * DIM;
+  const uint32_t D_sp_addr_start = 1 << (ADDR_LEN-1);
+  const uint32_t C_sp_addr_start = (3 << (ADDR_LEN-2)) | (full_C << (ADDR_LEN-3));
+
+  // move d from cur_proc to Gemmini_soc_mem
+  if (reinterpret_cast<const intptr_t>(D) > 1) {
+   for (uint16_t i = 0; i < I; i++) {
+      for (uint16_t j = 0; j < J; j++) {
+        const size_t sizeof_D = low_D ? sizeof(elem_t) : sizeof(acc_t);
+        const intptr_t dram_addr =  reinterpret_cast<const intptr_t>(D) +
+          (i * D_row_stride + j) * DIM * sizeof_D;
+
+        const uint64_t sp_addr = D_sp_addr_start + (i*J + j)*DIM;
+
+        // printf("D_sp_addr = %p\n", sp_addr);
+
+        const uint64_t cols = DIM - (j == J-1 ? pad_J : 0);
+        const uint64_t rows = DIM - (i == I-1 ? pad_I : 0);
+
+
+        move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), sp_addr, cols, rows, 2);
+      }
+    }
+  }
+
+  // move a and b from cur_proce to Gemmini_soc_mem
+  for (uint16_t k = 0; k < K; k++) {
+    for (uint16_t j = 0; j < J; j++) {
+      for (uint16_t i = 0; i < I; i++) {
+        const uint32_t A_sp_addr = a_transpose ? (A_sp_addr_start + (k*I + i)*DIM) :
+          (A_sp_addr_start + (i*K + k)*DIM);
+        const uint32_t B_sp_addr = b_transpose ? (B_sp_addr_start + (j*K + k)*DIM) :
+          (B_sp_addr_start + (k*J + j)*DIM);
+
+        if (j == 0) {
+          intptr_t dram_addr;
+          uint64_t cols, rows;
+
+          if (a_transpose) {
+            dram_addr = reinterpret_cast<const intptr_t>(A) +
+                (k*A_row_stride + i) * DIM * sizeof(elem_t);
+            cols = DIM - (i == I-1 ? pad_I : 0);
+            rows = DIM - (k == K-1 ? pad_K : 0);
+          } else {
+            dram_addr = reinterpret_cast<const intptr_t>(A) +
+                (i*A_row_stride + k) * DIM * sizeof(elem_t);
+            cols = DIM - (k == K-1 ? pad_K : 0);
+            rows = DIM - (i == I-1 ? pad_I : 0);
+          }
+
+          // printf("A_sp_addr = %p\n", A_sp_addr);
+
+          move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), A_sp_addr, cols, rows, 0);
+        }
+        // Mvin B
+        if (i == 0) {
+          intptr_t dram_addr;
+          uint64_t cols, rows;
+
+          if (b_transpose) {
+            dram_addr = reinterpret_cast<const intptr_t>(B) +
+                (j*B_row_stride + k) * DIM * sizeof(elem_t);
+            cols = DIM - (k == K-1 ? pad_K : 0);
+            rows = DIM - (j == J-1 ? pad_J : 0);
+          } else {
+            dram_addr = reinterpret_cast<const intptr_t>(B) +
+                (k*B_row_stride + j) * DIM * sizeof(elem_t);
+            cols = DIM - (j == J-1 ? pad_J : 0);
+            rows = DIM - (k == K-1 ? pad_K : 0);
+          }
+          // printf("B_sp_addr = %p\n", B_sp_addr);
+
+          move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), B_sp_addr, cols, rows, 1);
+        }
+      }
+    }
+  }
+  
+
+
   // Combined loop
   gemmini_loop_ws(I, J, K, pad_I, pad_J, pad_K, A, B, no_bias ? NULL : D, C,
     A_row_stride, B_row_stride, repeating_bias ? 0 : D_row_stride, C_row_stride,
     a_transpose, b_transpose,
     full_C, low_D, !no_bias || D == NULL,
     act);
+
+  // mvout C
+  for (uint16_t k = K-1; k < K; k++) {
+    for (uint16_t j = 0; j < J; j++) {
+      for (uint16_t i = 0; i < I; i++) {
+        const uint32_t C_sp_addr = C_sp_addr_start + (i*J + j)*DIM;
+        if (C != 0 && k == K-1) {
+           const size_t sizeof_C = full_C ? sizeof(acc_t) : sizeof(elem_t);
+           const intptr_t C_dram_addr = reinterpret_cast<const intptr_t>(C) +
+                (i*C_row_stride + j) * DIM * sizeof_C;
+
+           const uint64_t C_cols = DIM - (j == J - 1 ? pad_J : 0);
+           const uint64_t C_rows = DIM - (i == I - 1 ? pad_I : 0);
+
+          //  printf("C_sp_addr = %p\n", C_sp_addr);
+          //  printf("C_dram_addr = %p\n", C_dram_addr);
+
+           move_from_gemmini_soc_mem_to_cur_proc_mem(reinterpret_cast<void (*)>(C_dram_addr), C_sp_addr, C_cols, C_rows);
+        }
+      }
+    }
+  }
     
 }
 

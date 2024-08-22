@@ -24,7 +24,7 @@ void DefineIterate(Ila &child, gemmini_statevars_t &svs);
 enum loop_ws_child_states {
     LOOP_WS_INACTIVE, 
     LOAD_D, 
-    GET_SP_ADDRS,
+    COMPUTE_LOOP_START,
     MVIN_A, 
     MVIN_B, 
     CONFIG_PRELOAD, 

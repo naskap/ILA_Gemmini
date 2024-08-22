@@ -146,7 +146,7 @@ static void tiled_matmul_nn_auto(size_t dim_I, size_t dim_J, size_t dim_K,
 
     if (check) {
         printf("%s: CPU\n", layer_name);
-        elem_t gold[dim_I][dim_J];
+        elem_t (*gold)[dim_J] = reinterpret_cast<elem_t (*)[dim_J]>(calloc(dim_I, dim_J*sizeof(elem_t)));
         tiled_matmul_auto(dim_I, dim_J, dim_K,
             (elem_t*)A, (elem_t*)B, D, (elem_t*)gold, 
             dim_K, dim_J, dim_J, dim_J,

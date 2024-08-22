@@ -136,7 +136,7 @@ void DefineLoadChildInstruction(Ila& child, int load_num,
                         (load_statevars.read_inputType == BoolConst(read_inputtype)) &
                         (load_statevars.accumulate == BoolConst(accumulate))); 
     }else{
-        load_elem.SetDecode((Extract(command.rs2, 31, 31) == BvConst(is_acc_addr,1)));
+        load_elem.SetDecode((load_statevars.acc_or_spad == BoolConst(is_acc_addr)));
     }
     
 
