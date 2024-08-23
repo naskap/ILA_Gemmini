@@ -161,6 +161,8 @@ static void tiled_matmul_nn_auto(size_t dim_I, size_t dim_J, size_t dim_K,
             printf("Layer calculated incorrectly: %s\n", layer_name);
             exit(1);
         }
+
+        free(gold);
     }
 }
 
