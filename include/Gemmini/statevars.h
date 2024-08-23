@@ -159,11 +159,102 @@ struct loop_ws_statevars_t {
 
 };
 
+struct loop_conv_ws_statevars_t {
+
+  // Configs
+  ExprRef batch_size      = (ExprRef) NULL;
+  ExprRef in_dim          = (ExprRef) NULL;
+  ExprRef in_channels     = (ExprRef) NULL;
+  ExprRef out_channels    = (ExprRef) NULL;
+  ExprRef out_dim         = (ExprRef) NULL;
+  ExprRef pool_out_dim    = (ExprRef) NULL;
+  ExprRef stride          = (ExprRef) NULL;
+  ExprRef padding         = (ExprRef) NULL;
+  ExprRef kernel_dim      = (ExprRef) NULL;
+  ExprRef pool_size       = (ExprRef) NULL;
+  ExprRef pool_stride     = (ExprRef) NULL;
+  ExprRef pool_padding    = (ExprRef) NULL;
+  ExprRef batches         = (ExprRef) NULL;
+  ExprRef porows          = (ExprRef) NULL;
+  ExprRef pocols          = (ExprRef) NULL;
+  ExprRef pochs           = (ExprRef) NULL;
+  ExprRef krows           = (ExprRef) NULL;
+  ExprRef kcols           = (ExprRef) NULL;
+  ExprRef kchs            = (ExprRef) NULL;
+  ExprRef lpad            = (ExprRef) NULL;
+  ExprRef rpad            = (ExprRef) NULL;
+  ExprRef upad            = (ExprRef) NULL;
+  ExprRef dpad            = (ExprRef) NULL;
+  ExprRef plpad           = (ExprRef) NULL;
+  ExprRef orows           = (ExprRef) NULL;
+  ExprRef prad            = (ExprRef) NULL;
+  ExprRef pupad           = (ExprRef) NULL;
+  ExprRef pdpad           = (ExprRef) NULL;
+  ExprRef kernel_dilation = (ExprRef) NULL;
+  ExprRef ocols           = (ExprRef) NULL;
+  ExprRef weights         = (ExprRef) NULL;
+  ExprRef output          = (ExprRef) NULL;
+  ExprRef bias            = (ExprRef) NULL;
+  ExprRef input           = (ExprRef) NULL;
+
+  // Command args
+  ExprRef no_bias            = (ExprRef) NULL;
+  ExprRef wrot180            = (ExprRef) NULL;
+  ExprRef trans_output_1203  = (ExprRef) NULL;
+  ExprRef trans_weight_1203  = (ExprRef) NULL;
+  ExprRef trans_weight_0132  = (ExprRef) NULL;
+  ExprRef trans_input_3120   = (ExprRef) NULL;
+  ExprRef dw                 = (ExprRef) NULL;
+  ExprRef max_pixels_per_row = (ExprRef) NULL;
+  ExprRef no_pool            = (ExprRef) NULL;
+  ExprRef downsample         = (ExprRef) NULL;
+  ExprRef input_dilated      = (ExprRef) NULL;
+  ExprRef activation         = (ExprRef) NULL;
+
+  // Helpers
+  ExprRef b                               = (ExprRef) NULL;
+  ExprRef dilated_krows                   = (ExprRef) NULL;
+  ExprRef dilated_kcols                   = (ExprRef) NULL;
+  ExprRef irows_without_dilation          = (ExprRef) NULL;
+  ExprRef icols_without_dilation          = (ExprRef) NULL;
+  ExprRef irows_unpadded_without_dilation = (ExprRef) NULL;
+  ExprRef icols_unpadded_without_dilation = (ExprRef) NULL;
+  ExprRef irows_unpadded                  = (ExprRef) NULL;
+  ExprRef icols_unpadded                  = (ExprRef) NULL;
+  ExprRef irows                           = (ExprRef) NULL;
+  ExprRef icols                           = (ExprRef) NULL;
+  ExprRef out_channels_per_bank           = (ExprRef) NULL;
+  ExprRef in_channels_per_bank            = (ExprRef) NULL;
+  ExprRef B_rows                          = (ExprRef) NULL;
+  ExprRef D_sp_addr_row                   = (ExprRef) NULL;
+  ExprRef C_sp_addr_row                   = (ExprRef) NULL;
+  ExprRef A_sp_addr_start                 = (ExprRef) NULL;
+  ExprRef B_sp_addr_start                 = (ExprRef) NULL;
+  ExprRef D_sp_addr_start                 = (ExprRef) NULL;
+  ExprRef C_sp_addr_start                 = (ExprRef) NULL;
+  ExprRef new_weights                     = (ExprRef) NULL;
+  ExprRef max_ochs_per_mvin               = (ExprRef) NULL;
+  ExprRef max_chs_per_mvin                = (ExprRef) NULL;
+  ExprRef spad_stride                     = (ExprRef) NULL;
+  ExprRef orow                            = (ExprRef) NULL;
+  ExprRef ocol                            = (ExprRef) NULL;
+  ExprRef och                             = (ExprRef) NULL;
+  ExprRef irow                            = (ExprRef) NULL;
+  ExprRef icol                            = (ExprRef) NULL;
+  ExprRef ich                             = (ExprRef) NULL;
+  ExprRef krow                            = (ExprRef) NULL;
+  ExprRef kcol                            = (ExprRef) NULL;
+  ExprRef kch                             = (ExprRef) NULL;
+  ExprRef child_state                     = (ExprRef) NULL;
+
+};
+
 struct gemmini_statevars_t {
     load_statevars_t load[NUM_MVIN_CONFIG_SETS];
     store_statevars_t store;
     execute_statevars_t exec;
     loop_ws_statevars_t loop_ws;
+    loop_conv_ws_statevars_t loop_conv;
 
 };
 

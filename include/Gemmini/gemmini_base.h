@@ -109,7 +109,7 @@ extern void DefineStore(Ila& m, command_t& command, gemmini_memory_t memory, sto
 extern void DefineExecute(Ila& m, command_t& command, gemmini_memory_t memory, execute_statevars_t &execute_statevars);
 extern void DefineLoopWS(Ila& m, command_t& command, gemmini_memory_t memory, gemmini_statevars_t &svs);
 extern void DefineLoopConv(Ila& m, command_t& command, gemmini_memory_t memory, gemmini_statevars_t &svs);
-
+extern void DefineLoopConvWS(Ila& m, command_t& command, gemmini_memory_t memory, gemmini_statevars_t &svs);
 
 // Uninterpreted functions
 static auto scale = SortRef::BV(32);

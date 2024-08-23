@@ -21,6 +21,7 @@ Ila GetGemminiIla(const std::string& model_name) {
   DefineStore(m, command, memory, gemmini_statevars.store);
   DefineExecute(m, command, memory, gemmini_statevars.exec);
   DefineLoopWS(m, command, memory, gemmini_statevars);
+  DefineLoopConvWS(m, command, memory, gemmini_statevars);
 
   return m;
 }
