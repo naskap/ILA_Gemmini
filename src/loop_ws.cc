@@ -174,7 +174,7 @@ void DefineLoadD(Ila &child, gemmini_statevars_t &svs){
     auto cols = BvConst(ARRAY_DIM, 16) - Ite(svs.loop_ws.j == (svs.loop_ws.J - 1), svs.loop_ws.pad_J, BvConst(0, 16));
     auto rows = BvConst(ARRAY_DIM, 16) - Ite(svs.loop_ws.i == (svs.loop_ws.I - 1), svs.loop_ws.pad_I, BvConst(0, 16));
 
-    _CallMvin(load_d, svs.load[2], dram_addr, sp_addr, rows, cols);
+    CallMvin(load_d, svs.load[2], dram_addr, sp_addr, rows, cols);
 
     // Iterate loop vars
     std::vector<ExprRef> iteration_vars = {svs.loop_ws.i, svs.loop_ws.j};
@@ -186,18 +186,6 @@ void DefineLoadD(Ila &child, gemmini_statevars_t &svs){
 
 }
 
-
-void _CallMvin(InstrRef &caller, load_statevars_t &load_svs, ExprRef &dram_addr, ExprRef &sp_addr, ExprRef &rows, ExprRef &cols){
-
-    caller.SetUpdate(load_svs.soc_mem_base_address, dram_addr);
-    caller.SetUpdate(load_svs.spad_base_address, Extract(sp_addr,28,0));
-    caller.SetUpdate(load_svs.acc_or_spad, SelectBit(sp_addr, 31) == 1);
-    caller.SetUpdate(load_svs.accumulate, SelectBit(sp_addr, 30) == 1);
-    caller.SetUpdate(load_svs.num_rows, rows);
-    caller.SetUpdate(load_svs.num_cols, cols);
-    caller.SetUpdate(load_svs.child_valid, BoolConst(true));
-
-}
 
 void DefineComputeLoopStart(Ila &child, gemmini_statevars_t &svs){
 
@@ -246,7 +234,7 @@ void DefineMvinA(Ila &child, gemmini_statevars_t &svs){
     auto pad_rows = Ite(a_row == a_num_rows - 1, row_dim_pad, BvConst(0, 16));
     auto rows = BvConst(ARRAY_DIM, 16) - pad_rows;
 
-    _CallMvin(mvin_a, svs.load[0], dram_addr, svs.loop_ws.A_sp_addr, rows, cols);
+    CallMvin(mvin_a, svs.load[0], dram_addr, svs.loop_ws.A_sp_addr, rows, cols);
 
     auto next_child_state = Ite(svs.loop_ws.i == 0, BvConst(loop_ws_child_states::MVIN_B, svs.loop_ws.child_state.bit_width()),
                                                     BvConst(loop_ws_child_states::CONFIG_PRELOAD, svs.loop_ws.child_state.bit_width()));
@@ -273,7 +261,7 @@ void DefineMvinB(Ila &child, gemmini_statevars_t &svs){
     auto pad_rows = Ite(b_row == b_num_rows - 1, row_dim_pad, BvConst(0, 16));
     auto rows = BvConst(ARRAY_DIM, 16) - pad_rows;
 
-    _CallMvin(mvin_b, svs.load[1], dram_addr, svs.loop_ws.B_sp_addr, rows, cols);
+    CallMvin(mvin_b, svs.load[1], dram_addr, svs.loop_ws.B_sp_addr, rows, cols);
 
     auto next_child_state = BvConst(loop_ws_child_states::CONFIG_PRELOAD, svs.loop_ws.child_state.bit_width());
     mvin_b.SetUpdate(svs.loop_ws.child_state, next_child_state);

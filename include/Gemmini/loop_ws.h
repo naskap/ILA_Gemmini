@@ -11,7 +11,6 @@ void DefineLoopWSConfigStridesAB(Ila &m,command_t &command, loop_ws_statevars_t 
 void DefineLoopWSConfigStridesDC(Ila &m,command_t &command, loop_ws_statevars_t &loop_svs);
 void DefineLoopWSInstruction(Ila &m, command_t &command, gemmini_statevars_t &svs); 
 void DefineLoadD(Ila &child, gemmini_statevars_t &svs);
-void _CallMvin(InstrRef &caller, load_statevars_t &load_svs, ExprRef &dram_addr, ExprRef &sp_addr, ExprRef &rows, ExprRef &cols);
 void DefineComputeLoopStart(Ila &child, gemmini_statevars_t &svs);
 void DefineMvinA(Ila &child, gemmini_statevars_t &svs);
 void DefineMvinB(Ila &child, gemmini_statevars_t &svs);

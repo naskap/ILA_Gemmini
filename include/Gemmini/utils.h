@@ -2,6 +2,8 @@
 #ifndef GEMMINI_UTILS_H
 #define GEMMINI_UTILS_H
 #include <ilang/ilang++.h>
+#include <string.h>
+#include <Gemmini/statevars.h>
 
 namespace ilang {
 
@@ -16,10 +18,21 @@ extern ExprRef LoadMulti(ExprRef memory, ExprRef addr, int addresses);
 extern ExprRef StoreMulti(ExprRef &memory, ExprRef &to_store, ExprRef &start_addr);
 extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max);
 extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_maximums);
-
+extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_increments, std::vector<ExprRef> &loop_maximums);
+extern ExprRef Mod(ExprRef const &x, ExprRef const &y);
 extern ExprRef ApplyActivation(ExprRef &src, ExprRef &act, unsigned int out_width);
 extern ExprRef CastBv(ExprRef &src, unsigned int out_width);
 extern ExprRef ReLUCast(ExprRef &accTypeElmt, unsigned int out_width);
+extern void CallMvin(InstrRef &caller, load_statevars_t &load_svs, ExprRef &dram_addr, ExprRef &sp_addr, ExprRef &rows, ExprRef &cols);
+
+template<class To, class From>
+To _bit_cast(const From& src) noexcept
+{ 
+    To dst;
+    memcpy(&dst, &src, sizeof(To));
+    return dst;
+}
+
 
 }
 }
