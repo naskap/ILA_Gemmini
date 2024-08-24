@@ -66,22 +66,22 @@ void DefineLoopConvWSStatevars(Ila &m, loop_conv_ws_statevars_t &svs){
     svs.dw                 = m.NewBoolState("loop_conv_ws_dw");
     svs.max_pixels_per_row = m.NewBvState("loop_conv_ws_max_pixels_per_row", 8);
     svs.no_pool            = m.NewBoolState("loop_conv_ws_no_pool");
-    svs.downsample         = m.NewBoolState("loop_conv_ws_downsample");
+    svs.downsample         = m.NewBvState("loop_conv_ws_downsample", 1);
     svs.input_dilated      = m.NewBvState("loop_conv_ws_input_dilated", 1);
     svs.activation         = m.NewBvState("loop_conv_ws_activation", 2);
 
     // Helpers
     svs.b                               = m.NewBvState("loop_conv_ws_b", 16);
-    svs.dilated_krows                   = m.NewBvState("loop_conv_ws_dilated_krows", 32);
-    svs.dilated_kcols                   = m.NewBvState("loop_conv_ws_dilated_kcols", 32);
-    svs.irows_without_dilation          = m.NewBvState("loop_conv_ws_irows_without_dilation", 32);
-    svs.icols_without_dilation          = m.NewBvState("loop_conv_ws_icols_without_dilation", 32);
-    svs.irows_unpadded_without_dilation = m.NewBvState("loop_conv_ws_irows_unpadded_without_dilation", 32);
-    svs.icols_unpadded_without_dilation = m.NewBvState("loop_conv_ws_icols_unpadded_without_dilation", 32);
-    svs.irows_unpadded                  = m.NewBvState("loop_conv_ws_irows_unpadded", 32);
-    svs.icols_unpadded                  = m.NewBvState("loop_conv_ws_icols_unpadded", 32);
-    svs.irows                           = m.NewBvState("loop_conv_ws_irows", 32);
-    svs.icols                           = m.NewBvState("loop_conv_ws_icols", 32);
+    svs.dilated_krows                   = m.NewBvState("loop_conv_ws_dilated_krows", 16);
+    svs.dilated_kcols                   = m.NewBvState("loop_conv_ws_dilated_kcols", 16);
+    svs.irows_without_dilation          = m.NewBvState("loop_conv_ws_irows_without_dilation", 16);
+    svs.icols_without_dilation          = m.NewBvState("loop_conv_ws_icols_without_dilation", 16);
+    svs.irows_unpadded_without_dilation = m.NewBvState("loop_conv_ws_irows_unpadded_without_dilation", 16);
+    svs.icols_unpadded_without_dilation = m.NewBvState("loop_conv_ws_icols_unpadded_without_dilation", 16);
+    svs.irows_unpadded                  = m.NewBvState("loop_conv_ws_irows_unpadded", 16);
+    svs.icols_unpadded                  = m.NewBvState("loop_conv_ws_icols_unpadded", 16);
+    svs.irows                           = m.NewBvState("loop_conv_ws_irows", 16);
+    svs.icols                           = m.NewBvState("loop_conv_ws_icols", 16);
     svs.out_channels_per_bank           = m.NewBvState("loop_conv_ws_out_channels_per_bank", 32);
     svs.in_channels_per_bank            = m.NewBvState("loop_conv_ws_in_channels_per_bank", 32);
     svs.B_rows                          = m.NewBvState("loop_conv_ws_B_rows", 32);
@@ -92,15 +92,15 @@ void DefineLoopConvWSStatevars(Ila &m, loop_conv_ws_statevars_t &svs){
     svs.D_sp_addr_start   = m.NewBvState("loop_conv_ws_D_sp_addr_start", 32);
     svs.C_sp_addr_start   = m.NewBvState("loop_conv_ws_C_sp_addr_start", 32);
     svs.new_weights       = m.NewBvState("loop_conv_ws_new_weights", 32);
-    svs.max_ochs_per_mvin = m.NewBvState("loop_conv_ws_max_ochs_per_mvin", 32);
-    svs.max_chs_per_mvin  = m.NewBvState("loop_conv_ws_max_chs_per_mvin", 32);
+    svs.max_ochs_per_mvin = m.NewBvState("loop_conv_ws_max_ochs_per_mvin", 16);
+    svs.max_chs_per_mvin  = m.NewBvState("loop_conv_ws_max_chs_per_mvin", 16);
     svs.spad_stride       = m.NewBvState("loop_conv_ws_spad_stride", 32);
     svs.orow              = m.NewBvState("loop_conv_ws_orow", 16);
     svs.ocol              = m.NewBvState("loop_conv_ws_ocol", 16);
     svs.och               = m.NewBvState("loop_conv_ws_och", 16);
-    svs.irow              = m.NewBvState("loop_conv_ws_irow", 32);
-    svs.icol              = m.NewBvState("loop_conv_ws_icol", 32);
-    svs.ich               = m.NewBvState("loop_conv_ws_ich", 32);
+    svs.irow              = m.NewBvState("loop_conv_ws_irow", 16);
+    svs.icol              = m.NewBvState("loop_conv_ws_icol", 16);
+    svs.ich               = m.NewBvState("loop_conv_ws_ich", 16);
     svs.krow              = m.NewBvState("loop_conv_ws_krow", 16);
     svs.kcol              = m.NewBvState("loop_conv_ws_kcol", 16);
     svs.kch               = m.NewBvState("loop_conv_ws_kch", 16);
@@ -211,7 +211,7 @@ void DefineLoopConvWSInstruction(Ila &m, command_t &command, gemmini_statevars_t
     loop_conv.SetUpdate(conv_svs.max_pixels_per_row, mppr_zero_is_one);
     
     loop_conv.SetUpdate(conv_svs.no_pool, SelectBit(command.rs2, 0) == 1);
-    loop_conv.SetUpdate(conv_svs.downsample, SelectBit(command.rs2, 1) == 1);
+    loop_conv.SetUpdate(conv_svs.downsample, SelectBit(command.rs2, 1));
 
     auto input_dilated_next = SelectBit(command.rs2, 2);
     loop_conv.SetUpdate(conv_svs.input_dilated, input_dilated_next);
@@ -221,16 +221,16 @@ void DefineLoopConvWSInstruction(Ila &m, command_t &command, gemmini_statevars_t
     auto dilated_kcols                   = conv_svs.kcols + (conv_svs.kernel_dilation - 1)*(conv_svs.kcols - 1);
     auto irows_without_dilation          = conv_svs.orows * conv_svs.stride + dilated_krows - 1;
     auto icols_without_dilation          = conv_svs.ocols * conv_svs.stride + dilated_kcols - 1;
-    auto irows_unpadded_without_dilation = conv_svs.irows_without_dilation - conv_svs.upad.ZExt(32) - conv_svs.dpad.ZExt(32);
-    auto icols_unpadded_without_dilation = conv_svs.icols_without_dilation - conv_svs.lpad.ZExt(32) - conv_svs.rpad.ZExt(32);
+    auto irows_unpadded_without_dilation = conv_svs.irows_without_dilation - conv_svs.upad - conv_svs.dpad;
+    auto icols_unpadded_without_dilation = conv_svs.icols_without_dilation - conv_svs.lpad - conv_svs.rpad;
 
-    auto irows_unpadded_next = Ite(input_dilated_next == 1, (irows_unpadded_without_dilation + 1)/BvConst(2,32), irows_unpadded_without_dilation);
-    auto icols_unpadded_next = Ite(input_dilated_next == 1, (icols_unpadded_without_dilation + 1)/BvConst(2,32), icols_unpadded_without_dilation);
+    auto irows_unpadded_next = Ite(input_dilated_next == 1, (irows_unpadded_without_dilation + 1)/BvConst(2,16), irows_unpadded_without_dilation);
+    auto icols_unpadded_next = Ite(input_dilated_next == 1, (icols_unpadded_without_dilation + 1)/BvConst(2,16), icols_unpadded_without_dilation);
     loop_conv.SetUpdate(conv_svs.irows_unpadded, irows_unpadded_next);
     loop_conv.SetUpdate(conv_svs.icols_unpadded, icols_unpadded_next);
 
-    loop_conv.SetUpdate(conv_svs.irows, Ite(input_dilated_next == 1, irows_unpadded_next + _UNDILATED(conv_svs.upad, input_dilated_next).ZExt(32) + _UNDILATED(conv_svs.dpad, input_dilated_next).ZExt(32), irows_without_dilation.ZExt(32)));
-    loop_conv.SetUpdate(conv_svs.icols, Ite(input_dilated_next == 1, icols_unpadded_next + _UNDILATED(conv_svs.lpad, input_dilated_next).ZExt(32) + _UNDILATED(conv_svs.rpad, input_dilated_next).ZExt(32), icols_without_dilation.ZExt(32)));
+    loop_conv.SetUpdate(conv_svs.irows, Ite(input_dilated_next == 1, irows_unpadded_next + _UNDILATED(conv_svs.upad, input_dilated_next) + _UNDILATED(conv_svs.dpad, input_dilated_next), irows_without_dilation));
+    loop_conv.SetUpdate(conv_svs.icols, Ite(input_dilated_next == 1, icols_unpadded_next + _UNDILATED(conv_svs.lpad, input_dilated_next) + _UNDILATED(conv_svs.rpad, input_dilated_next), icols_without_dilation));
 
     auto array_dim_const       = BvConst(ARRAY_DIM, 16);
     auto out_channels_per_bank = conv_svs.ochs / array_dim_const + Mod(conv_svs.ochs, array_dim_const);
@@ -303,7 +303,7 @@ void DefineConfigMvinBias(Ila &child, gemmini_statevars_t &svs){
     
     // Set max_ochs_per_mvin
     auto dim_blocks_len    = BvConst(MAX_BLOCK_LEN_ACC * ARRAY_DIM, 16);
-    auto max_ochs_per_mvin = Ite(svs.loop_conv.ochs < dim_blocks_len, svs.loop_conv.ochs, dim_blocks_len);
+    auto max_ochs_per_mvin = Min(svs.loop_conv.ochs, dim_blocks_len);
     instr.SetUpdate(svs.loop_conv.max_ochs_per_mvin, max_ochs_per_mvin);
 
     // Set mvin configs
@@ -328,11 +328,11 @@ void DefineMvinBias(Ila &child, gemmini_statevars_t &svs){
     auto array_dim_const = BvConst(ARRAY_DIM, 16);
     auto ocols           = svs.loop_conv.ocols;
     auto ocol            = svs.loop_conv.ocol;
-    auto I               = Ite(ocols - ocol > array_dim_const, array_dim_const, ocols - ocol);
+    auto I               = Min(ocols - ocol, array_dim_const);
 
     auto ochs = svs.loop_conv.ochs;
     auto och  = svs.loop_conv.och;
-    auto J    = Ite(ochs - och > array_dim_const, array_dim_const, ochs - och);
+    auto J    = Min(ochs - och, array_dim_const);
 
     auto D_sp_addr = svs.loop_conv.D_sp_addr_start + ((och/array_dim_const).ZExt(32) * svs.loop_conv.batches.ZExt(32) * svs.loop_conv.orows.ZExt(32) * ocols.ZExt(32))
                                                    + svs.loop_conv.b.ZExt(32) * svs.loop_conv.orows.ZExt(32) * ocols.ZExt(32)
@@ -353,13 +353,38 @@ void DefineMvinBias(Ila &child, gemmini_statevars_t &svs){
                                                                BvConst(loop_conv_ws_child_states::MVIN_BIAS, svs.loop_conv.child_state.bit_width())));
                                                                
 }
+
+#define DS(x) ((x) >> (svs.loop_conv.downsample.ZExt(x.bit_width())))
+#define US(x) ((x) << (svs.loop_conv.downsample.ZExt(x.bit_width())))
+
 void DefineConfigMvinInput(Ila &child, gemmini_statevars_t &svs){
 
     // Define instruction
     auto instr = child.NewInstr("loop_conv_ws_CONFIG_MVIN_INPUT");
     instr.SetDecode(svs.loop_conv.child_state == BvConst(loop_conv_ws_child_states::CONFIG_MVIN_INPUT, svs.loop_conv.child_state.bit_width()));
     
-    // Update statevars
+
+    auto dim_blocks_max_len = BvConst(ARRAY_DIM * MAX_BLOCK_LEN, 16);
+    auto max_chs_per_mvin = Ite(svs.loop_conv.trans_input_3120, 
+                                Min(svs.loop_conv.batches, dim_blocks_max_len),
+                                Min(svs.loop_conv.kchs, dim_blocks_max_len));
+    instr.SetUpdate(svs.loop_conv.max_chs_per_mvin, max_chs_per_mvin);
+    
+    auto dram_stride = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.batch_size * INPUT_TYPE_WIDTH_BYTES,
+                                                            svs.loop_conv.in_channels * INPUT_TYPE_WIDTH_BYTES);
+                                    
+    auto spad_stride = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.kchs * DS(svs.loop_conv.irows) * DS(svs.loop_conv.icols),
+                                                            svs.loop_conv.batches * DS(svs.loop_conv.irows) * DS(svs.loop_conv.icols));
+
+    auto read_inputtype = BoolConst(false);
+    auto scale          = BvConst(_bit_cast<uint32_t, float>(1), 32);   // Bitcast a float scale to an int
+    _ConfigMvinUpdateStatevars(instr, svs.load[0], read_inputtype, spad_stride, scale, US(dram_stride), svs.loop_conv.max_pixels_per_row);
+
+    instr.SetUpdate(svs.loop_conv.irow, _UNDILATED(svs.loop_conv.upad, svs.loop_conv.input_dilated) * -1);
+    instr.SetUpdate(svs.loop_conv.icol, _UNDILATED(svs.loop_conv.lpad, svs.loop_conv.input_dilated) * -1);
+
+    instr.SetUpdate(svs.loop_conv.child_state, BvConst(loop_conv_ws_child_states::MVIN_INPUT,16));
+   
 }
 void DefineMvinInput(Ila &child, gemmini_statevars_t &svs){
 
@@ -367,7 +392,67 @@ void DefineMvinInput(Ila &child, gemmini_statevars_t &svs){
     auto instr = child.NewInstr("loop_conv_ws_MVIN_INPUT");
     instr.SetDecode(svs.loop_conv.child_state == BvConst(loop_conv_ws_child_states::MVIN_INPUT, svs.loop_conv.child_state.bit_width()));
     
-    // Update statevars
+
+    // Put some statevars in named variabled for simplicity
+    auto irow = svs.loop_conv.irow;
+    auto irows = svs.loop_conv.irows;
+    auto irows_unpadded = svs.loop_conv.irows_unpadded;
+    auto icol = svs.loop_conv.icol;
+    auto icols = svs.loop_conv.icols;
+    auto icols_unpadded = svs.loop_conv.icols_unpadded;
+
+
+    auto irow_padded = irow + _UNDILATED(svs.loop_conv.upad, svs.loop_conv.input_dilated);
+    
+    auto array_dim_const = BvConst(ARRAY_DIM, 16);
+    auto I = Ite(icol < 0, Min(icol * -1, array_dim_const), 
+                 Ite(icol >= icols_unpadded, 
+                    Min(icols_unpadded + _UNDILATED(svs.loop_conv.rpad, svs.loop_conv.input_dilated) + icol, array_dim_const),
+                Min(icols_unpadded - icol, US(array_dim_const))));
+    
+    auto icol_padded = icol + _UNDILATED(svs.loop_conv.lpad, svs.loop_conv.input_dilated);
+
+    auto K = Ite(svs.loop_conv.trans_input_3120, Min(svs.loop_conv.batches - svs.loop_conv.b, svs.loop_conv.max_chs_per_mvin),
+                        Min(svs.loop_conv.kchs - svs.loop_conv.ich, svs.loop_conv.max_chs_per_mvin));
+    
+    auto A_sp_addr = svs.loop_conv.A_sp_addr_start + (svs.loop_conv.ich / array_dim_const).ZExt(32) * svs.loop_conv.spad_stride.ZExt(32) 
+                                                    + svs.loop_conv.b.ZExt(32) * DS(irows).ZExt(32) * DS(icols).ZExt(32) 
+                                                    + DS(irow_padded).ZExt(32) * DS(icols).ZExt(32) * DS(icol_padded).ZExt(32);
+
+    auto is_zeros = (irow < 0) | (irow >= irows_unpadded) 
+                               | (icol < 0)
+                               | (icol >= icols_unpadded);
+
+    
+    auto in = svs.loop_conv.input + ((svs.loop_conv.b.ZExt(32) * svs.loop_conv.in_dim.ZExt(32) * svs.loop_conv.in_dim.ZExt(32) 
+                                        + irow.ZExt(32) * svs.loop_conv.in_dim.ZExt(32) 
+                                        + icol.ZExt(32))  
+                                    * svs.loop_conv.in_channels.ZExt(32) +svs.loop_conv.ich.ZExt(32)).ZExt(64) * INPUT_TYPE_WIDTH_BYTES;
+
+    in = Ite(is_zeros, BvConst(0, 64), in);
+    in = Ite(svs.loop_conv.trans_input_3120, 
+            svs.loop_conv.input + ((svs.loop_conv.ich.ZExt(32) * svs.loop_conv.in_dim.ZExt(32) * svs.loop_conv.in_dim.ZExt(32) 
+                                        + irow.ZExt(32) * svs.loop_conv.in_dim.ZExt(32) 
+                                        + icol.ZExt(32))  
+                                    * svs.loop_conv.batch_size.ZExt(32) +svs.loop_conv.b.ZExt(32)).ZExt(64) * INPUT_TYPE_WIDTH_BYTES,
+            in);   
+
+
+    auto const_one = BvConst(1, 16);
+    auto b_it    = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.max_chs_per_mvin, const_one);  
+    auto ich_it  = Ite(svs.loop_conv.trans_input_3120, const_one, svs.loop_conv.max_chs_per_mvin);                      
+
+    
+    std::vector<ExprRef> iteration_vars        = {svs.loop_conv.b, irow, icol, svs.loop_conv.ich};
+    std::vector<ExprRef> iteration_init_values = {BvConst(0,16), _UNDILATED(svs.loop_conv.upad, svs.loop_conv.input_dilated) * -1,
+                                                  _UNDILATED(svs.loop_conv.lpad, svs.loop_conv.input_dilated) * -1, BvConst(0,16)};
+    std::vector<ExprRef> iteration_increments  = {b_it,  US(const_one), I, ich_it};
+    std::vector<ExprRef> iteration_maxs        = {svs.loop_conv.batches, irows_unpadded + _UNDILATED(svs.loop_conv.dpad, svs.loop_conv.input_dilated), 
+                                                icols_unpadded + _UNDILATED(svs.loop_conv.rpad, svs.loop_conv.input_dilated), svs.loop_conv.kchs};
+    auto last_pixel                           = IterateLoopVars(instr, iteration_vars, iteration_maxs);
+
+    instr.SetUpdate(svs.loop_conv.child_state, Ite(last_pixel, BvConst(loop_conv_ws_child_states::CONFIG_MVIN_WEIGHTS,16), 
+                                                            BvConst(loop_conv_ws_child_states::MVIN_INPUT,16)));
 }
 void DefineConfigMvinWeights(Ila &child, gemmini_statevars_t &svs){
 

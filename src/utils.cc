@@ -54,28 +54,32 @@ ExprRef SetMemElmt(ExprRef const &dest_mem, ExprRef const &row, ExprRef const &c
     return dest_mem.Store(row, updated_bv);
 }
 
-extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max){
+extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max, ExprRef const &reset){
 
     auto unwrapped_result = num1 + num2;
     auto max_extended     = max.ZExt(unwrapped_result.bit_width());
-    return Ite(unwrapped_result >= max_extended, BvConst(0, unwrapped_result.bit_width()), unwrapped_result);
+    return Ite(unwrapped_result >= max_extended, reset, unwrapped_result);
 }
 
 
-// Note that all loop vars need to be the same size
-extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_increments, std::vector<ExprRef> &loop_maximums){
+
+
+
+extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_init_values, std::vector<ExprRef> &loop_increments, std::vector<ExprRef> &loop_maximums){
     ILA_ASSERT(loop_vars.size() == loop_maximums.size());
     ILA_ASSERT(loop_increments.size() == loop_maximums.size());
+    ILA_ASSERT(loop_increments.size() == loop_init_values.size());
 
     ExprRef iterate_next = BoolConst(true);
     for(int idx=loop_vars.size() - 1; idx >= 0; idx--){
         
         auto loop_var = loop_vars.at(idx);
+        auto init_value = loop_init_values.at(idx);
         auto increment = loop_increments.at(idx);
         auto max = loop_maximums.at(idx);
 
         // Update iteration var
-        instr.SetUpdate(loop_var, Ite(iterate_next, WrappingAdd(loop_var, increment, max), loop_var));
+        instr.SetUpdate(loop_var, Ite(iterate_next, WrappingAdd(loop_var, increment, max, init_value), loop_var));
 
         // Iterate the next state variable if current loop is wrapping around
         iterate_next = iterate_next & (loop_var >= max.ZExt(loop_var.bit_width()) - increment);
@@ -83,6 +87,18 @@ extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars,
     }
 
     return iterate_next;
+}
+
+
+
+extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_increments, std::vector<ExprRef> &loop_maximums){
+
+    std::vector<ExprRef> loop_init_values;
+    for(int i = 0; i < loop_vars.size(); i++){
+        loop_init_values.emplace_back(BvConst(0, loop_vars.at(i).bit_width()));
+    }
+
+    return IterateLoopVars(instr, loop_vars, loop_init_values, loop_increments, loop_maximums);
 }
 
 
@@ -157,6 +173,12 @@ extern ExprRef ReLUCast(ExprRef &x, unsigned int out_width){
 extern ExprRef Mod(ExprRef const &x, ExprRef const &y){
 
     return x - ((x/y)*y);
+
+}
+
+extern ExprRef Min(ExprRef const &num1, ExprRef const &num2){
+
+    return Ite(num1 < num2, num1, num2);
 
 }
 
