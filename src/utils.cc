@@ -62,9 +62,6 @@ extern ExprRef WrappingAdd(ExprRef &num1, ExprRef &num2, ExprRef &max, ExprRef c
 }
 
 
-
-
-
 extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars, std::vector<ExprRef> &loop_init_values, std::vector<ExprRef> &loop_increments, std::vector<ExprRef> &loop_maximums){
     ILA_ASSERT(loop_vars.size() == loop_maximums.size());
     ILA_ASSERT(loop_increments.size() == loop_maximums.size());
@@ -112,6 +109,30 @@ extern ExprRef IterateLoopVars(InstrRef &instr, std::vector<ExprRef> &loop_vars,
     return IterateLoopVars(instr, loop_vars, loop_increments, loop_maximums);
 }
 
+
+// dims: The dimension sizes from most significant to least significant 
+// iter_vars: Iteration vars from most significant to least significant
+ExprRef GetAddrOffset(std::vector<ExprRef> dims, std::vector<ExprRef> iter_vars, int addr_width){
+
+    // Add a dummy entry to make the arrays the same size
+    if((dims.size()) == iter_vars.size() - 1){
+        dims.emplace(dims.begin(), BvConst(0,1));
+    }
+
+    ILA_ASSERT(dims.size() == iter_vars.size());
+
+
+    auto to_return = iter_vars.at(iter_vars.size() - 1).ZExt(addr_width);
+    auto cur_dim = dims.at(dims.size() - 1).ZExt(addr_width);
+
+    for(int idx = iter_vars.size() - 2; idx >= 0 ; idx--){
+        to_return = to_return + iter_vars.at(idx).ZExt(addr_width) * cur_dim;
+        cur_dim = cur_dim * dims.at(idx).ZExt(addr_width);
+    }
+
+    return to_return;
+    
+}
 
 // Assumes soc_mem is little endian and we want to store our bitvector 
 //       with the most significant bits being at the highest addresses
