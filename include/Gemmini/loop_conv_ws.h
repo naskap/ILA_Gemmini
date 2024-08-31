@@ -31,7 +31,7 @@ void DefineLoopConvWSConfig4(Ila &m, command_t &command, loop_conv_ws_statevars_
 void DefineLoopConvWSConfig5(Ila &m, command_t &command, loop_conv_ws_statevars_t &svs);
 void DefineLoopConvWSConfig6(Ila &m, command_t &command, loop_conv_ws_statevars_t &svs);
 void DefineLoopConvWSInstruction(Ila &m, command_t &command, gemmini_statevars_t &svs); 
-ExprRef _UNDILATED(ExprRef &x, ExprRef &input_dilated);
+ExprRef _UNDILATED(ExprRef const &x, ExprRef &input_dilated);
 void DefineConfigMvinBias(Ila &child, gemmini_statevars_t &svs);
 void DefineMvinBias(Ila &child, gemmini_statevars_t &svs);
 void DefineConfigMvinInput(Ila &child, gemmini_statevars_t &svs);

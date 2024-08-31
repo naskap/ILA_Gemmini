@@ -177,7 +177,7 @@ struct loop_conv_ws_statevars_t {
   ExprRef batches         = (ExprRef) NULL;
   ExprRef porows          = (ExprRef) NULL;
   ExprRef pocols          = (ExprRef) NULL;
-  ExprRef ochs           = (ExprRef) NULL;
+  ExprRef ochs            = (ExprRef) NULL;
   ExprRef krows           = (ExprRef) NULL;
   ExprRef kcols           = (ExprRef) NULL;
   ExprRef kchs            = (ExprRef) NULL;
@@ -226,8 +226,6 @@ struct loop_conv_ws_statevars_t {
   ExprRef out_channels_per_bank           = (ExprRef) NULL;
   ExprRef in_channels_per_bank            = (ExprRef) NULL;
   ExprRef B_rows                          = (ExprRef) NULL;
-  // ExprRef D_sp_addr_row                   = (ExprRef) NULL;
-  // ExprRef C_sp_addr_row                   = (ExprRef) NULL;
   ExprRef A_sp_addr_start                 = (ExprRef) NULL;
   ExprRef B_sp_addr_start                 = (ExprRef) NULL;
   ExprRef D_sp_addr_start                 = (ExprRef) NULL;
@@ -246,7 +244,9 @@ struct loop_conv_ws_statevars_t {
   ExprRef kcol                            = (ExprRef) NULL;
   ExprRef kch                             = (ExprRef) NULL;
   ExprRef child_state                     = (ExprRef) NULL;
-
+  ExprRef I                               = (ExprRef) NULL;
+  ExprRef J                               = (ExprRef) NULL;
+  ExprRef K                               = (ExprRef) NULL;
 };
 
 struct gemmini_statevars_t {
