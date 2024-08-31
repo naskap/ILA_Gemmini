@@ -198,19 +198,18 @@ static acc_scale_t_bits acc_scale_t_to_acc_scale_t_bits(acc_scale_t x) {
 
 #define mvin_src_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && g.Gemmini_load0_read_inputType == 0) ? 4 : 1)
 
-void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows, unsigned int load_num){
+void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows, unsigned int src_stride){
   if(dram_addr == NULL)
     return;
   
-  unsigned int stride = load_num == 0 ? g.Gemmini_load0_src_stride.to_int() : load_num == 1 ? g.Gemmini_load1_src_stride.to_int() : g.Gemmini_load2_src_stride.to_int();
+
+  // printf("about to move %x bytes into soc_mem \n", rows * cols * mvin_src_elmt_size_bytes(spad_addr));
   for(int row=0;row < rows; row++){ 
     for(int col=0; col < cols; col++){ 
-      int8_t *elmt_address = ((int8_t *) dram_addr) + row * stride + col * mvin_src_elmt_size_bytes(spad_addr);
+      int8_t *elmt_address = ((int8_t *) dram_addr) + row * src_stride + col * mvin_src_elmt_size_bytes(spad_addr);
       for(int i = 0; i < mvin_src_elmt_size_bytes(spad_addr); i++){
         int8_t *byte_address = elmt_address + i;
-        sc_biguint<8> data = *(byte_address);
-        sc_biguint<64> byte_address_sc = (uint64_t) byte_address;
-        g.Gemmini_soc_mem[byte_address_sc] = data;
+        g.Gemmini_soc_mem[(uint64_t) byte_address] = *(byte_address);
       }
     }
   }
@@ -219,14 +218,16 @@ void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned i
 // mvin and mvout
 #define gemmini_extended_mvin(dram_addr, spad_addr, cols, rows) \
   { \
-  move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows, 0); \
+  move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows, g.Gemmini_load0_src_stride.to_int()); \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN) \
   } \
 
 #define gemmini_extended_mvin2(dram_addr, spad_addr, cols, rows) \
+  move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows, g.Gemmini_load1_src_stride.to_int()); \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN2)
 
 #define gemmini_extended_mvin3(dram_addr, spad_addr, cols, rows) \
+  move_from_cur_proc_mem_to_gemmini_soc_mem(dram_addr, spad_addr, cols, rows, g.Gemmini_load2_src_stride.to_int()); \
   ROCC_INSTRUCTION_RS1_RS2(XCUSTOM_ACC, dram_addr, ((uint64_t)(rows) << (ADDR_LEN + 16)) | ((uint64_t)(cols) << ADDR_LEN) | (spad_addr), k_MVIN3)
 
 #define gemmini_block_mvin(dram_addr, spad_addr, len) \
@@ -238,6 +239,24 @@ void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned i
 #define mvout_dest_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && (spad_addr >> 29) & 1) ? 4 : 1)
 
 void move_from_gemmini_soc_mem_to_cur_proc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows){
+  // printf("about to move %x bytes out of soc_mem \n", rows * cols * mvout_dest_elmt_size_bytes(spad_addr));
+  
+  for(int row=0;row < rows; row++){                     
+    for(int col=0; col < cols; col++){  
+      int8_t *address_ptr = ((int8_t *) dram_addr) + row * g.Gemmini_store_stride.to_int() + col * mvout_dest_elmt_size_bytes(spad_addr);   
+      sc_biguint<64> address = (uint64_t) address_ptr;   
+      for(int i = 0; i < mvout_dest_elmt_size_bytes(spad_addr); i++){
+        sc_bigint<8> data = g.Gemmini_soc_mem[address + i];   
+        *(address_ptr + i) = data.to_int();                     
+      }                                                 
+    }                                                   
+  }                                                    
+}
+
+
+void move_from_gemmini_soc_mem_to_cur_proc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows, unsigned int channels){
+  // printf("about to move %x bytes out of soc_mem \n", rows * cols * mvout_dest_elmt_size_bytes(spad_addr));
+  
   for(int row=0;row < rows; row++){                     
     for(int col=0; col < cols; col++){  
       int8_t *address_ptr = ((int8_t *) dram_addr) + row * g.Gemmini_store_stride.to_int() + col * mvout_dest_elmt_size_bytes(spad_addr);   
@@ -736,7 +755,7 @@ static void sp_tiled_matmul_ws(const elem_t * A, const elem_t * B,
         const uint64_t rows = DIM - (i == I-1 ? pad_I : 0);
 
 
-        move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), sp_addr, cols, rows, 2);
+        move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), sp_addr, cols, rows, g.Gemmini_load2_src_stride.to_int());
       }
     }
   }
@@ -768,7 +787,7 @@ static void sp_tiled_matmul_ws(const elem_t * A, const elem_t * B,
 
           // printf("A_sp_addr = %p\n", A_sp_addr);
 
-          move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), A_sp_addr, cols, rows, 0);
+          move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), A_sp_addr, cols, rows, g.Gemmini_load0_src_stride.to_int());
         }
         // Mvin B
         if (i == 0) {
@@ -788,7 +807,7 @@ static void sp_tiled_matmul_ws(const elem_t * A, const elem_t * B,
           }
           // printf("B_sp_addr = %p\n", B_sp_addr);
 
-          move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), B_sp_addr, cols, rows, 1);
+          move_from_cur_proc_mem_to_gemmini_soc_mem(reinterpret_cast<void (*)>(dram_addr), B_sp_addr, cols, rows, g.Gemmini_load1_src_stride.to_int());
         }
       }
     }
@@ -1561,7 +1580,205 @@ static void sp_tiled_conv(
   }
 
   if (in_row_dim == in_col_dim && out_row_dim == out_col_dim && pool_out_row_dim == pool_out_col_dim) {
+
+
+  // mvin bias
+  {
+    if (bias != NULL) {
+      // TODO we probably don't need quite this many nested loops for this part
+
+      const int max_ochs_per_mvin = ochs < MAX_BLOCK_LEN_ACC * DIM ? ochs :
+          MAX_BLOCK_LEN_ACC * DIM;
+
+
+      for (int b = 0; b < batches; b++)
+        for (int orow = 0; orow < orows; orow++)
+          for (int ocol = 0; ocol < ocols; ocol += DIM) {
+            const int I = ocols - ocol > DIM ? DIM : ocols - ocol;
+
+            for (int och = 0; och < ochs; och += max_ochs_per_mvin) {
+              const int J = ochs - och > max_ochs_per_mvin ? max_ochs_per_mvin : ochs - och;
+
+              const uint32_t D_sp_addr = D_sp_addr_start + (och / DIM) * batches * orows * ocols + b * orows * ocols + orow * ocols + ocol;
+
+              const acc_t * bias_dram_addr = no_bias ? NULL : bias + och;
+
+              move_from_cur_proc_mem_to_gemmini_soc_mem(bias_dram_addr, D_sp_addr, J, I, 0);
+            }
+          }
+    }
+  }
+
+  
+  { // mvin inputs
+   int max_chs_per_mvin = ichs < MAX_BLOCK_LEN * DIM ? ichs :
+      MAX_BLOCK_LEN * DIM;
+    if (trans_input_3120) {
+      max_chs_per_mvin = batches < MAX_BLOCK_LEN * DIM ? batches :
+        MAX_BLOCK_LEN * DIM;
+    }
+
+    const int dram_stride = trans_input_3120 ?
+      batch_size * sizeof(elem_t) :
+      in_channels * sizeof(elem_t);
+
+    const int spad_stride = trans_input_3120 ?
+      ichs * (irows >> downsample) * (icols >> downsample) :
+      batches * (irows >> downsample) * (icols >> downsample);
+
+    const int b_it = trans_input_3120 ? max_chs_per_mvin : 1;
+    const int ich_it = trans_input_3120 ? 1 : max_chs_per_mvin;
+
+    for (int b = 0; b < batches; b += b_it)
+      for (int irow = -UNDILATED(upad); irow < irows_unpadded + UNDILATED(dpad); irow += 1 + downsample) {
+        const int irow_padded = irow + UNDILATED(upad);
+
+        for (int icol = -UNDILATED(lpad); icol < icols_unpadded + UNDILATED(rpad);) {
+          // TODO There might be some unnecessary mvins here at the edge of the image
+
+          int I = icols_unpadded - icol > (DIM << downsample) ?
+            (DIM << downsample) : icols_unpadded - icol;
+
+          if (icol < 0) {
+            I = -icol > DIM ? DIM : -icol;
+          } else if (icol >= icols_unpadded) {
+            I = icols_unpadded + UNDILATED(rpad) - icol > DIM ? DIM : icols_unpadded + UNDILATED(rpad) - icol;
+          }
+
+          const int icol_padded = icol + UNDILATED(lpad);
+
+          for (int ich = 0; ich < ichs; ich += ich_it) {
+            int K = ichs - ich > max_chs_per_mvin ?
+              max_chs_per_mvin : ichs - ich;
+            if (trans_input_3120) {
+              K = batches - b > max_chs_per_mvin ?
+                max_chs_per_mvin : batches - b;
+            }
+
+#define DS(x) ((x) >> (downsample))
+
+            uint32_t A_sp_addr = A_sp_addr_start + (ich / DIM) * batches * DS(irows) * DS(icols) + b * DS(irows) * DS(icols) + DS(irow_padded) * DS(icols) + DS(icol_padded);
+            if (trans_input_3120) {
+              A_sp_addr = A_sp_addr_start + (b / DIM) * ichs * DS(irows) * DS(icols) + ich * DS(irows) * DS(icols) + DS(irow_padded) * DS(icols) + DS(icol_padded);
+            }
+
+            const bool is_zeros = irow < 0 || irow >= irows_unpadded || icol < 0 || icol >= icols_unpadded;
+
+            const elem_t * in = input + (b*in_row_dim*in_col_dim + irow*in_col_dim + icol) * in_channels + ich;
+            if (is_zeros) {
+              in = NULL;
+            } else if (trans_input_3120) {
+              in = input + (ich*in_row_dim*in_col_dim + irow*in_col_dim + icol) * batch_size + b;
+            }
+
+             move_from_cur_proc_mem_to_gemmini_soc_mem(in, A_sp_addr, K, I >> downsample, dram_stride << downsample);
+          }
+
+          icol += I;
+        }
+      }
+  }
+
+   // mvin weights
+  {
+    int max_chs_per_mvin = ochs < MAX_BLOCK_LEN * DIM ? ochs :
+        MAX_BLOCK_LEN * DIM;
+    if (trans_weight_0132) {
+      max_chs_per_mvin = kchs < MAX_BLOCK_LEN * DIM ? kchs :
+          MAX_BLOCK_LEN * DIM;
+    }
+
+    size_t dram_stride = out_channels * sizeof(elem_t);
+    if (dw) {
+      dram_stride = sizeof(elem_t);
+    } else if (trans_weight_1203) {
+      dram_stride = kernel_dim * kernel_dim * out_channels * sizeof(elem_t);
+    } else if (trans_weight_0132) {
+      dram_stride = in_channels * sizeof(elem_t);
+    }
+
+    const size_t spad_block_stride = trans_weight_0132 ?
+      krows * kcols * ochs : krows * kcols * kchs;
+
+    const size_t och_it = trans_weight_0132 ? DIM : max_chs_per_mvin;
+    const size_t kch_it = trans_weight_0132 ? max_chs_per_mvin : DIM;
+
+    for (int och = 0; och < ochs; och += och_it) {
+      for (int krow = 0; krow < krows; krow++)
+        for (int kcol = 0; kcol < kcols; kcol++)
+          for (int kch = 0; kch < kchs; kch += kch_it) {
+            int K = kchs - kch > DIM ? DIM : kchs - kch;
+            int J = ochs - och > max_chs_per_mvin ? max_chs_per_mvin : ochs - och;
+            if (trans_weight_0132) {
+              K = ochs - och > DIM ? DIM : ochs - och;
+              J = kchs - kch > max_chs_per_mvin ? max_chs_per_mvin : kchs - kch;
+            }
+
+            uint32_t B_sp_addr = B_sp_addr_start + (och / DIM) * krows * kcols * kchs + krow * kcols * kchs + kcol * kchs + kch;
+            if (trans_weight_0132) {
+              B_sp_addr = B_sp_addr_start + (kch / DIM) * krows * kcols * ochs + krow * kcols * ochs + kcol * ochs + och;
+            }
+
+            const elem_t * w = weights + (krow*kernel_dim*in_channels + kcol*in_channels + kch) * out_channels + och;
+            if (dw) {
+              w = weights + krow * kernel_dim + kcol;
+            } else if (trans_weight_1203) {
+              w = weights + (kch * kernel_dim * kernel_dim + krow * kernel_dim + kcol) * out_channels + och;
+            } else if (trans_weight_0132) {
+              w = weights + (krow * kernel_dim * out_channels + kcol * out_channels + och) * in_channels + kch;
+            }
+
+             move_from_cur_proc_mem_to_gemmini_soc_mem(w, B_sp_addr, J, K, dram_stride);
+          }
+    }
+  }
+  
+
+
     gemmini_loop_conv_ws(batch_size, in_row_dim, in_channels, out_channels, out_row_dim, pool_out_row_dim, stride, padding, kernel_dim, kernel_dilation, pool_size, pool_stride, pool_padding, batches, porows, pocols, pochs, krows, kcols, kchs, lpad, rpad, upad, dpad, plpad, prpad, pupad, pdpad, orows, ocols, weights, output, bias, input, no_bias, no_pool, downsample, wrot180, input_dilated, act, trans_output_1203, trans_weight_1203, trans_weight_0132, trans_input_3120, max_pixels_per_row, dw);
+    
+    
+      if (output != NULL) {
+    if (no_pool) {
+      for (int b = 0; b < batches; b++)
+        for (int orow = 0; orow < orows; orow++)
+          for (int ocol = 0; ocol < ocols; ocol += DIM) {
+            const int I = ocols - ocol > DIM ? DIM : ocols - ocol;
+
+            for (int och = 0; och < ochs; och += DIM) {
+              const int J = ochs - och > DIM ? DIM : ochs - och;
+
+              const uint32_t C_sp_addr = C_sp_addr_start + (och / DIM) * batches * orows * ocols + b * orows * ocols + orow * ocols + ocol;
+
+              elem_t * out = output + (b*out_row_dim*out_col_dim + orow*out_col_dim + ocol) * out_channels + och;
+              if (trans_output_1203) {
+                out = output + (orow*out_col_dim*batch_size + ocol*batch_size + b) * out_channels + och;
+              }
+
+              move_from_gemmini_soc_mem_to_cur_proc_mem(out, C_sp_addr, J, I);
+            }
+          }
+    } else {
+
+
+      for (int b = 0; b < batches; b++) {
+        for (int poch = 0; poch < pochs; poch += DIM) {
+          const int channels = poch + DIM >= pochs ? pochs - poch : DIM;
+
+          elem_t * pout = output + (b * pool_out_row_dim * pool_out_col_dim)*out_channels + poch;
+
+          const uint32_t C_sp_addr = C_sp_addr_start + (poch / DIM) * batches * orows * ocols + b * orows * ocols;
+
+          move_from_gemmini_soc_mem_to_cur_proc_mem(pout, C_sp_addr, channels, 0);
+        }
+      }
+
+
+    }
+  }
+    
+    
+    
     return;
   }
 
