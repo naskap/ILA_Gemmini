@@ -40,69 +40,10 @@ SC_MODULE(Testbench){
 
     gemmini_flush(0);
 
-        // g.instr_log.open("./instr_log.txt",std::ofstream::out);
-    // g.instr_update_log.open("./instr_update_log", std::ofstream::out);
-    status = test_status::UNFINISHED;
-  }
-  void tb_thread(){
-  
-  int argc = 1;
-  char *argv[] = {const_cast<char*>("./Gemmini_test_mobilenet")};
-
-  
-#ifndef BAREMETAL
-    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
-      perror("mlockall failed");
-      status = 1; return;
-    }
-#endif
-
-    gemmini_flush(0);
-
     enum tiled_matmul_type_t tiled_matmul_type = WS;
-
-    // if (argc < 2) {
-    //     tiled_matmul_type = WS;
-    // } else if (strcmp(argv[1], "cpu") == 0) {
-    //     tiled_matmul_type = CPU;
-    // } else if (strcmp(argv[1], "os") == 0) {
-    //     tiled_matmul_type = OS;
-    // } else if (strcmp(argv[1], "ws") == 0) {
-    //     tiled_matmul_type = WS;
-    // } else if (strcmp(argv[1], "-h") == 0) {
-    //     printf("usage: %s [-h] matmul_option [check]\n  matmul_option may be 'os', 'ws', or cpu'\n", argv[0]);
-    //     status = 0; return;
-    // } else {
-    //     printf("Unknown command-line argument\n");
-    //     printf("usage: %s [-h] matmul_option [check]\n  matmul_option may be 'os', 'ws', or cpu'\n", argv[0]);
-    //     status = 1; return;
-    // }
-
-    bool conv = false;
-    
-    // if (argc < 3) {
-    //     conv = true;
-    // } else if (strcmp(argv[2], "conv") == 0) {
-    //     conv = true;
-    // } else if (strcmp(argv[2], "matmul") == 0) {
-    //     conv = false;
-    // } else {
-    //     printf("Unknown command-line argument\n");
-    //     printf("usage: %s [-h] matmul_option [check] [conv]\n  matmul_option may be 'os', 'ws', or cpu'\n", argv[0]);
-    //     status = 1; return;
-    // }
-
+    bool conv = true;
     bool check = true;
     
-    // if (argc < 4) {
-    //     check = false;
-    // } else if (strcmp(argv[3], "check") == 0) {
-    //     check = true;
-    // } else {
-    //     printf("Unknown command-line argument\n");
-    //     printf("usage: %s [-h] matmul_option [check]\n  matmul_option may be 'os', 'ws', or cpu'\n", argv[0]);
-    //     status = 1; return;
-    // }
     
     uint64_t start, end;
     uint64_t im2col_cycles = 0, matmul_cycles = 0, conv_cycles = 0, pool_cycles = 0, conv_dw_cycles = 0, res_add_cycles = 0, other_cycles = 0;
