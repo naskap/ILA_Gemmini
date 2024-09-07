@@ -11,13 +11,13 @@
 
 #ifndef BAREMETAL
 
-#define BATCH_SIZE 4
-#define IN_ROW_DIM 224
-#define IN_COL_DIM 224
-#define IN_CHANNELS 3
-#define OUT_CHANNELS 32
-#define KERNEL_DIM 3
-#define PADDING 1
+#define BATCH_SIZE 1
+#define IN_ROW_DIM 16
+#define IN_COL_DIM 16
+#define IN_CHANNELS 1
+#define OUT_CHANNELS 2
+#define KERNEL_DIM 1
+#define PADDING 0
 #define STRIDE 2
 
 #else
@@ -208,6 +208,10 @@ SC_MODULE(Testbench){
 
     printf("Randomize inputs...\n");
     init_random(&input[0][0][0][0], sizeof(input) / sizeof(elem_t));
+    elem_t *ptr = &input[0][0][0][0];
+    for (int i = 0 ; i < sizeof(input) / sizeof(elem_t); i++) {
+        *(ptr + i) = i;
+    }
 
     printf("Randomize weights...\n");
     init_random(&weights[0][0][0][0], sizeof(weights) / sizeof(elem_t));
