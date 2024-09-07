@@ -30,12 +30,12 @@ void DefineStoreStateVars(Ila& m, store_statevars_t& store_statevars) {
     store_statevars.maxpool_params.out_cols          = m.NewBvState("store_maxpool_out_cols", 8);
 
     // Store command args
-    store_statevars.num_rows = m.NewBvState("store_num_rows", 16);
-    store_statevars.num_cols = m.NewBvState("store_num_cols", 16);
+    store_statevars.num_rows             = m.NewBvState("store_num_rows", 16);
+    store_statevars.num_cols             = m.NewBvState("store_num_cols", 16);
     store_statevars.soc_mem_base_address = m.NewBvState("store_soc_mem_base_address", 64);
-    store_statevars.is_acc_addr = m.NewBoolState("store_is_acc_addr");
-    store_statevars.read_acctype = m.NewBoolState("store_accumulate");
-    store_statevars.src_base_address = m.NewBvState("store_src_base_address", 29);
+    store_statevars.is_acc_addr          = m.NewBoolState("store_is_acc_addr");
+    store_statevars.read_acctype         = m.NewBoolState("store_read_acctype");
+    store_statevars.src_base_address     = m.NewBvState("store_src_base_address", 29);
 
     // Store child helper variables
     store_statevars.child_valid = m.NewBoolState("store_child_valid");
@@ -44,7 +44,7 @@ void DefineStoreStateVars(Ila& m, store_statevars_t& store_statevars) {
     store_statevars.cur_ch      = m.NewBvState("store_cur_ch", 16);
     store_statevars.cur_wrow    = m.NewBvState("store_cur_wrow", 16);
     store_statevars.cur_wcol    = m.NewBvState("store_cur_wcol", 16);
-    store_statevars.cur_max     = m.NewBvState("store_cur_max", ACC_TYPE_WIDTH_BITS);
+    store_statevars.cur_max     = m.NewBvState("store_cur_max", INPUT_TYPE_WIDTH_BITS);
 
 }
 
@@ -92,7 +92,7 @@ void DefineStoreInstruction(Ila& m, command_t command, gemmini_memory_t memory,
     store.SetUpdate(store_statevars.cur_ch, BvConst(0, 16));
     store.SetUpdate(store_statevars.cur_wrow, BvConst(0, 16));
     store.SetUpdate(store_statevars.cur_wcol, BvConst(0, 16));
-    store.SetUpdate(store_statevars.cur_max, BvConst( 1UL << (ACC_TYPE_WIDTH_BITS - 1), ACC_TYPE_WIDTH_BITS));
+    store.SetUpdate(store_statevars.cur_max, BvConst( 1UL << (INPUT_TYPE_WIDTH_BITS - 1), INPUT_TYPE_WIDTH_BITS));
     
 
     // Define child ILA
@@ -155,22 +155,31 @@ void DefineStoreChildInstruction(Ila& child,
         auto cond_out_of_bounds = orow < BvConst(0,orow.bit_width()) | ocol < BvConst(0,ocol.bit_width()) | orow >= maxp_params.out_rows.ZExt(32) | ocol >= maxp_params.out_cols.ZExt(32);
 
         // Compute cur element
-        int  elem_size = from_accumulator ? ACC_TYPE_WIDTH_BITS : INPUT_TYPE_WIDTH_BITS;
-        auto elem           = BvConst(0, elem_size);
+        auto elem = BvConst(0, INPUT_TYPE_WIDTH_BITS);
         if(from_accumulator){
-            auto acc_value = GetMemElmt(memory.accumulator, row_addr, store_statevars.cur_ch, elem_size);
+            auto acc_value        = GetMemElmt(memory.accumulator, row_addr, store_statevars.cur_ch, ACC_TYPE_WIDTH_BITS);
             auto acc_value_scaled = ScaleAccType(acc_value, store_statevars.accScale);
                  elem             = Ite((!cond_out_of_bounds), acc_value_scaled, elem);
         }else{
-            auto spad_value = GetMemElmt(memory.spad, row_addr, store_statevars.cur_ch, elem_size);
+            auto spad_value = GetMemElmt(memory.spad, row_addr, store_statevars.cur_ch, INPUT_TYPE_WIDTH_BITS);
                  elem       = Ite((!cond_out_of_bounds), spad_value, elem);
         }
 
-        //  Update max
-        auto elem_extended = elem.SExt(ACC_TYPE_WIDTH_BITS);
-        auto updated_max   = Ite(elem_extended > store_statevars.cur_max, elem_extended, store_statevars.cur_max);
-        store_elem.SetUpdate(store_statevars.cur_max, updated_max);
 
+        auto last_elem = (store_statevars.cur_wcol == maxp_params.window_size.ZExt(16) - 1) & (store_statevars.cur_wrow == maxp_params.window_size.ZExt(16) - 1);
+
+        //  Update max
+        auto updated_max   = Ite(elem > store_statevars.cur_max, elem, store_statevars.cur_max);
+        auto cur_max_next = Ite(last_elem, BvConst(1UL << (INPUT_TYPE_WIDTH_BITS - 1), INPUT_TYPE_WIDTH_BITS), updated_max);
+        store_elem.SetUpdate(store_statevars.cur_max, cur_max_next);
+
+
+        auto dram_byte_addr = store_statevars.soc_mem_base_address + ((store_statevars.cur_row * maxp_params.out_dim.ZExt(16) + store_statevars.cur_col).ZExt(32) * store_statevars.stride + store_statevars.cur_ch.ZExt(32) * INPUT_TYPE_WIDTH_BYTES).ZExt(64);
+        auto soc_mem_next   = Ite(last_elem, Store(memory.soc_mem, dram_byte_addr, updated_max), memory.soc_mem);
+        store_elem.SetUpdate(memory.soc_mem, soc_mem_next);
+
+        
+        
         // Update state variables
         std::vector<ExprRef> iteration_vars = {store_statevars.cur_row, 
                                                 store_statevars.cur_col, 
@@ -200,7 +209,7 @@ void DefineStoreChildInstruction(Ila& child,
         auto load_elmt_size_bv = BvConst(load_elmt_size, 16);
         auto array_dim_bv      = BvConst(ARRAY_DIM, 16);
         auto block             = store_statevars.cur_col / array_dim_bv;
-        auto spad_col          = store_statevars.cur_col - block * array_dim_bv;                                                            // Equiv to cur_col % ARRAY_DIM
+        auto spad_col          = store_statevars.cur_col - block * array_dim_bv;                                                                            // Equiv to cur_col % ARRAY_DIM
         auto spad_row          = store_statevars.src_base_address.ZExt(32) + ZExt(store_statevars.cur_row, 32) + ZExt(block, 32) * ZExt(array_dim_bv, 32);
     
         // Load data
