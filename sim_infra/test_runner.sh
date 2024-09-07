@@ -14,9 +14,7 @@ for file in "../app"/*; do
     test_cases+=("${test_name}")
 done
 
-select=("aligned" "mvin_mvout_acc_full_stride" "mvin_mvout_acc_full" 
-        "mvin_mvout_acc" "mvin_mvout_acc_zero_stride" "mvin_mvout_block_stride"  
-        "mvin_mvout_stride" "mvin_mvout" "mvin_mvout_zeros" "mvin_scale")
+select=("mvin_mvout" "matmul_os" "matmul_ws" "conv" "tiled_matmul_ws" )
 
 # Function to display help message
 print_help() {
