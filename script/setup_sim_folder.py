@@ -22,7 +22,7 @@ if __name__ == "__main__":
                     dirs_exist_ok=True)
 
     # Copy a test runner utility script
-    shutil.copy(src=os.path.join(ILA_Gemmini_root,"sim_infra/test_runner.sh"),
+    shutil.copy(src=os.path.join(ILA_Gemmini_root,"script/test_runner.sh"),
                 dst=sim_folder)
     
     # Overwrite default CMakeLists.txt
