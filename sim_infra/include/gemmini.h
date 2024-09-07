@@ -239,7 +239,6 @@ void move_from_cur_proc_mem_to_gemmini_soc_mem(const void *dram_addr, unsigned i
 #define mvout_dest_elmt_size_bytes(spad_addr) ((((spad_addr >> 31) & 1) && (spad_addr >> 29) & 1) ? 4 : 1)
 
 void move_from_gemmini_soc_mem_to_cur_proc_mem(const void *dram_addr, unsigned int spad_addr, unsigned int cols, unsigned int rows){
-  // printf("about to move %x bytes out of soc_mem \n", rows * cols * mvout_dest_elmt_size_bytes(spad_addr));
   
   for(int row=0;row < rows; row++){                     
     for(int col=0; col < cols; col++){  
@@ -1579,6 +1578,8 @@ static void sp_tiled_conv(
     C_sp_addr_row = (C_sp_addr_row + ACC_ROWS / 2) % ACC_ROWS;
   }
 
+  // printf("Hello world!!!\n");
+
   if (in_row_dim == in_col_dim && out_row_dim == out_col_dim && pool_out_row_dim == pool_out_col_dim) {
 
 
@@ -1629,6 +1630,8 @@ static void sp_tiled_conv(
     const int b_it = trans_input_3120 ? max_chs_per_mvin : 1;
     const int ich_it = trans_input_3120 ? 1 : max_chs_per_mvin;
 
+    // printf("irows_unpadded = %d, icols_unpadded = %d\n",irows_unpadded, icols_unpadded);
+    // printf("rpad = %d, dpad = %d\n",rpad, dpad);
     for (int b = 0; b < batches; b += b_it)
       for (int irow = -UNDILATED(upad); irow < irows_unpadded + UNDILATED(dpad); irow += 1 + downsample) {
         const int irow_padded = irow + UNDILATED(upad);
@@ -1671,6 +1674,14 @@ static void sp_tiled_conv(
               in = input + (ich*in_row_dim*in_col_dim + irow*in_col_dim + icol) * batch_size + b;
             }
 
+            // printf("is_zeros = %d\n", is_zeros);
+            // printf("icols_unpadded = %d\n", icols_unpadded);
+            // printf("icol = %d\n", icol);
+            // printf("I = %d\n", I);
+            // printf("mvin %d input elmts\n", max_pixels_per_row*K*(I >> downsample));
+            // printf("K = %p\n", K);
+            // printf("in = %p\n", in);
+            // printf("A_sp_addr = %p\n", A_sp_addr);
              move_from_cur_proc_mem_to_gemmini_soc_mem(in, A_sp_addr, K, I >> downsample, dram_stride << downsample);
           }
 
@@ -1699,6 +1710,7 @@ static void sp_tiled_conv(
 
     const size_t spad_block_stride = trans_weight_0132 ?
       krows * kcols * ochs : krows * kcols * kchs;
+    // printf("spad_block_stride = %d\n", spad_block_stride);
 
     const size_t och_it = trans_weight_0132 ? DIM : max_chs_per_mvin;
     const size_t kch_it = trans_weight_0132 ? max_chs_per_mvin : DIM;
@@ -1733,12 +1745,10 @@ static void sp_tiled_conv(
     }
   }
   
-
-
     gemmini_loop_conv_ws(batch_size, in_row_dim, in_channels, out_channels, out_row_dim, pool_out_row_dim, stride, padding, kernel_dim, kernel_dilation, pool_size, pool_stride, pool_padding, batches, porows, pocols, pochs, krows, kcols, kchs, lpad, rpad, upad, dpad, plpad, prpad, pupad, pdpad, orows, ocols, weights, output, bias, input, no_bias, no_pool, downsample, wrot180, input_dilated, act, trans_output_1203, trans_weight_1203, trans_weight_0132, trans_input_3120, max_pixels_per_row, dw);
     
-    
-      if (output != NULL) {
+    // mvout outputs
+    if (output != NULL) {
     if (no_pool) {
       for (int b = 0; b < batches; b++)
         for (int orow = 0; orow < orows; orow++)
@@ -1755,6 +1765,10 @@ static void sp_tiled_conv(
                 out = output + (orow*out_col_dim*batch_size + ocol*batch_size + b) * out_channels + och;
               }
 
+              // printf("C_sp_addr = %x\n", C_sp_addr);
+              // printf("J = %d, I = %d\n", J, I);
+              // printf("out = %p\n", out);
+
               move_from_gemmini_soc_mem_to_cur_proc_mem(out, C_sp_addr, J, I);
             }
           }
@@ -1769,7 +1783,12 @@ static void sp_tiled_conv(
 
           const uint32_t C_sp_addr = C_sp_addr_start + (poch / DIM) * batches * orows * ocols + b * orows * ocols;
 
-          move_from_gemmini_soc_mem_to_cur_proc_mem(pout, C_sp_addr, channels, 0);
+          for (int porow = 0; porow < porows; porow++) {
+            for (int pocol = 0; pocol < pocols; pocol++) {
+                auto const dram_byte_addr = pout + (porow * pool_out_col_dim + pocol) * g.Gemmini_store_stride.to_int() + poch * sizeof(elem_t);
+                move_from_gemmini_soc_mem_to_cur_proc_mem(dram_byte_addr, C_sp_addr, channels, 1);
+            }
+          }
         }
       }
 

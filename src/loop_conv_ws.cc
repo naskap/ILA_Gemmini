@@ -91,7 +91,7 @@ void DefineLoopConvWSStatevars(Ila &m, loop_conv_ws_statevars_t &svs){
     svs.B_sp_addr_start   = m.NewBvState("loop_conv_ws_B_sp_addr_start", 32);
     svs.D_sp_addr_start   = m.NewBvState("loop_conv_ws_D_sp_addr_start", 32);
     svs.C_sp_addr_start   = m.NewBvState("loop_conv_ws_C_sp_addr_start", 32);
-    svs.new_weights       = m.NewBvState("loop_conv_ws_new_weights", 32);
+    svs.new_weights       = m.NewBvState("loop_conv_ws_new_weights", 1);
     svs.max_ochs_per_mvin = m.NewBvState("loop_conv_ws_max_ochs_per_mvin", 16);
     svs.max_chs_per_mvin  = m.NewBvState("loop_conv_ws_max_chs_per_mvin", 16);
     svs.spad_stride       = m.NewBvState("loop_conv_ws_spad_stride", 32);
@@ -224,8 +224,8 @@ void DefineLoopConvWSInstruction(Ila &m, command_t &command, gemmini_statevars_t
     auto dilated_kcols                   = conv_svs.kcols + (conv_svs.kernel_dilation - 1)*(conv_svs.kcols - 1);
     auto irows_without_dilation          = conv_svs.orows * conv_svs.stride + dilated_krows - 1;
     auto icols_without_dilation          = conv_svs.ocols * conv_svs.stride + dilated_kcols - 1;
-    auto irows_unpadded_without_dilation = conv_svs.irows_without_dilation - conv_svs.upad - conv_svs.dpad;
-    auto icols_unpadded_without_dilation = conv_svs.icols_without_dilation - conv_svs.lpad - conv_svs.rpad;
+    auto irows_unpadded_without_dilation = irows_without_dilation - conv_svs.upad - conv_svs.dpad;
+    auto icols_unpadded_without_dilation = icols_without_dilation - conv_svs.lpad - conv_svs.rpad;
 
     auto irows_unpadded_next = Ite(input_dilated_next == 1, (irows_unpadded_without_dilation + 1)/BvConst(2,16), irows_unpadded_without_dilation);
     auto icols_unpadded_next = Ite(input_dilated_next == 1, (icols_unpadded_without_dilation + 1)/BvConst(2,16), icols_unpadded_without_dilation);
@@ -236,8 +236,8 @@ void DefineLoopConvWSInstruction(Ila &m, command_t &command, gemmini_statevars_t
     loop_conv.SetUpdate(conv_svs.icols, Ite(input_dilated_next == 1, icols_unpadded_next + _UNDILATED(conv_svs.lpad, input_dilated_next) + _UNDILATED(conv_svs.rpad, input_dilated_next), icols_without_dilation));
 
     auto array_dim_const       = BvConst(ARRAY_DIM, 16);
-    auto out_channels_per_bank = conv_svs.ochs / array_dim_const + Mod(conv_svs.ochs, array_dim_const);
-    auto in_channels_per_bank  = conv_svs.kchs / array_dim_const + Mod(conv_svs.kchs, array_dim_const);
+    auto out_channels_per_bank = conv_svs.ochs / array_dim_const + Ite(Mod(conv_svs.ochs, array_dim_const)!=0, BvConst(1,16), BvConst(0, 16));;
+    auto in_channels_per_bank  = conv_svs.kchs / array_dim_const + Ite(Mod(conv_svs.kchs, array_dim_const)!=0, BvConst(1,16), BvConst(0, 16));
     auto B_rows                = Ite(conv_svs.trans_weight_0132, in_channels_per_bank * conv_svs.kcols * conv_svs.krows * conv_svs.ochs, 
                                                     out_channels_per_bank * conv_svs.kcols * conv_svs.krows * conv_svs.kchs);
 
@@ -269,7 +269,7 @@ void DefineLoopConvWSInstruction(Ila &m, command_t &command, gemmini_statevars_t
     for(int i=0; i<NUM_MVIN_CONFIG_SETS; i++){
         loads_inactive = loads_inactive & (all_svs.load[i].child_valid == false);
     }
-    child.SetValid((all_svs.loop_ws.child_state != loop_conv_ws_child_states::LOOP_CONV_WS_INACTIVE) & loads_inactive & (all_svs.store.child_valid == false) & (all_svs.exec.child_state == 0));   
+    child.SetValid((all_svs.loop_conv.child_state != loop_conv_ws_child_states::LOOP_CONV_WS_INACTIVE) & loads_inactive & (all_svs.store.child_valid == false) & (all_svs.exec.child_state == 0));   
 
     // Define child instructions
     DefineConfigMvinBias(child, all_svs);
@@ -279,8 +279,8 @@ void DefineLoopConvWSInstruction(Ila &m, command_t &command, gemmini_statevars_t
     DefineConfigMvinWeights(child, all_svs);
     DefineMvinWeights(child, all_svs);
     DefineConfigCompute(child, all_svs);
-    DefineIterateOcol(child, all_svs);
-    DefineConfigPreloadCol(child, all_svs);
+    DefineAdjustStatevarsForInputDilation(child, all_svs);
+    DefineConfigPreloadConv(child, all_svs);
     DefineComputeConv(child, all_svs);
     DefineMvoutResultsNoPool(child, all_svs);
     DefineConfigMvoutResultsPool(child, all_svs);
@@ -341,7 +341,7 @@ void DefineMvinBias(Ila &child, gemmini_statevars_t &svs){
     //                                                + svs.loop_conv.b.ZExt(32) * svs.loop_conv.orows.ZExt(32) * ocols.ZExt(32)
     //                                                + svs.loop_conv.orow.ZExt(32) * ocols.ZExt(32)
     //                                                + ocol.ZExt(32);
-    std::vector<ExprRef> D_dims  = {svs.loop_conv.batches, svs.loop_conv.orows, svs.loop_conv.ocols, svs.loop_conv.ochs};
+    std::vector<ExprRef> D_dims  = {svs.loop_conv.batches, svs.loop_conv.orows, svs.loop_conv.ocols};
     std::vector<ExprRef> D_iters = {(och/array_dim_const), svs.loop_conv.b, svs.loop_conv.orow, svs.loop_conv.ocol};
     auto D_sp_addr               = svs.loop_conv.D_sp_addr_start + GetAddrOffset(D_dims, D_iters, 32);
 
@@ -351,11 +351,11 @@ void DefineMvinBias(Ila &child, gemmini_statevars_t &svs){
 
     CallMvin(instr, svs.load[2], dram_addr, D_sp_addr, I, J);
 
-    auto const_one                            = BvConst(1, 32);
+    auto const_one                            = BvConst(1, 16);
     std::vector<ExprRef> iteration_vars       = {svs.loop_conv.b, svs.loop_conv.orow, svs.loop_conv.ocol, svs.loop_conv.och};
-    std::vector<ExprRef> iteration_increments = {const_one, const_one, array_dim_const.ZExt(32), svs.loop_conv.max_ochs_per_mvin};
+    std::vector<ExprRef> iteration_increments = {const_one, const_one, array_dim_const, svs.loop_conv.max_ochs_per_mvin};
     std::vector<ExprRef> iteration_maxs       = {svs.loop_conv.batches, svs.loop_conv.orows, svs.loop_conv.ocols, svs.loop_conv.ochs};
-    auto last_pixel                           = IterateLoopVars(instr, iteration_vars, iteration_maxs);
+    auto last_pixel                           = IterateLoopVars(instr, iteration_vars, iteration_increments, iteration_maxs);
     instr.SetUpdate(svs.loop_conv.child_state, Ite(last_pixel, BvConst(loop_conv_ws_child_states::CONFIG_MVIN_INPUT, svs.loop_conv.child_state.bit_width()),
                                                                BvConst(loop_conv_ws_child_states::MVIN_BIAS, svs.loop_conv.child_state.bit_width())));
                                                                
@@ -414,7 +414,7 @@ void DefineMvinInput(Ila &child, gemmini_statevars_t &svs){
     auto array_dim_const = BvConst(ARRAY_DIM, 16);
     auto I               = Ite(icol < 0, Min(icol * -1, array_dim_const), 
                  Ite(icol >= icols_unpadded, 
-                    Min(icols_unpadded + _UNDILATED(svs.loop_conv.rpad, svs.loop_conv.input_dilated) + icol, array_dim_const),
+                    Min(icols_unpadded + _UNDILATED(svs.loop_conv.rpad, svs.loop_conv.input_dilated) - icol, array_dim_const),
                 Min(icols_unpadded - icol, US(array_dim_const))));
     
     auto icol_padded = icol + _UNDILATED(svs.loop_conv.lpad, svs.loop_conv.input_dilated);
@@ -426,9 +426,11 @@ void DefineMvinInput(Ila &child, gemmini_statevars_t &svs){
     auto A_dim_1                 = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.kchs, svs.loop_conv.batches);
     auto A_iter_1                = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.b, svs.loop_conv.ich) / array_dim_const;
     auto A_iter_2                = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.ich, svs.loop_conv.b);
-    std::vector<ExprRef> A_dims  = {A_dim_1, svs.loop_conv.irows, svs.loop_conv.icols};
-    std::vector<ExprRef> A_iters = {A_iter_1, A_iter_2, irow_padded, icol_padded};
+    std::vector<ExprRef> A_dims  = {A_dim_1, DS(svs.loop_conv.irows), DS(svs.loop_conv.icols)};
+    std::vector<ExprRef> A_iters = {A_iter_1, A_iter_2, DS(irow_padded), DS(icol_padded)};
     auto A_sp_addr               = svs.loop_conv.A_sp_addr_start + GetAddrOffset(A_dims, A_iters, 32);
+    
+    
     // auto A_sp_addr = svs.loop_conv.A_sp_addr_start + (svs.loop_conv.ich / array_dim_const).ZExt(32) * svs.loop_conv.spad_stride.ZExt(32) 
     //                                                 + svs.loop_conv.b.ZExt(32) * DS(irows).ZExt(32) * DS(icols).ZExt(32) 
     //                                                 + DS(irow_padded).ZExt(32) * DS(icols).ZExt(32) 
@@ -438,23 +440,22 @@ void DefineMvinInput(Ila &child, gemmini_statevars_t &svs){
                                | (icol < 0)
                                | (icol >= icols_unpadded);
 
-    ;
     
     auto in = svs.loop_conv.input + (GetAddrOffset({svs.loop_conv.in_dim, svs.loop_conv.in_dim}, 
                                                     {svs.loop_conv.b, svs.loop_conv.irow, svs.loop_conv.icol}, 32)  
                                     * svs.loop_conv.in_channels.ZExt(32) +svs.loop_conv.ich.ZExt(32)).ZExt(64) * INPUT_TYPE_WIDTH_BYTES;
 
-    in = Ite(is_zeros, BvConst(0, 64), in);
-    in = Ite(svs.loop_conv.trans_input_3120, 
-            svs.loop_conv.input + (GetAddrOffset({svs.loop_conv.in_dim, svs.loop_conv.in_dim}, 
-                                                {svs.loop_conv.ich, svs.loop_conv.irow, svs.loop_conv.icol}, 32)   
-                                    * svs.loop_conv.batch_size.ZExt(32) +svs.loop_conv.b.ZExt(32)).ZExt(64) * INPUT_TYPE_WIDTH_BYTES,
-            in);   
+    in = Ite(is_zeros, BvConst(0, 64), 
+            Ite(svs.loop_conv.trans_input_3120, 
+                svs.loop_conv.input + (GetAddrOffset({svs.loop_conv.in_dim, svs.loop_conv.in_dim}, 
+                                                    {svs.loop_conv.ich, svs.loop_conv.irow, svs.loop_conv.icol}, 32)   
+                                        * svs.loop_conv.batch_size.ZExt(32) +svs.loop_conv.b.ZExt(32)).ZExt(64) * INPUT_TYPE_WIDTH_BYTES,
+            in));
 
     auto rows = DS(I);
     auto cols = K;
 
-    CallMvin(instr, svs.load[0], in, A_sp_addr, I, K);
+    CallMvin(instr, svs.load[0], in, A_sp_addr, rows, cols);
 
     auto const_one = BvConst(1, 16);
     auto b_it      = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.max_chs_per_mvin, const_one);
@@ -467,7 +468,7 @@ void DefineMvinInput(Ila &child, gemmini_statevars_t &svs){
     std::vector<ExprRef> iteration_increments = {b_it,  US(const_one), I, ich_it};
     std::vector<ExprRef> iteration_maxs       = {svs.loop_conv.batches, irows_unpadded + _UNDILATED(svs.loop_conv.dpad, svs.loop_conv.input_dilated), 
                                                 icols_unpadded + _UNDILATED(svs.loop_conv.rpad, svs.loop_conv.input_dilated), svs.loop_conv.kchs};
-    auto last_pixel = IterateLoopVars(instr, iteration_vars, iteration_maxs);
+    auto last_pixel = IterateLoopVars(instr, iteration_vars, iteration_init_values, iteration_increments, iteration_maxs);
 
     instr.SetUpdate(svs.loop_conv.child_state, Ite(last_pixel, BvConst(loop_conv_ws_child_states::CONFIG_MVIN_WEIGHTS,16), 
                                                             BvConst(loop_conv_ws_child_states::MVIN_INPUT,16)));
@@ -483,9 +484,9 @@ void DefineConfigMvinWeights(Ila &child, gemmini_statevars_t &svs){
     instr.SetUpdate(svs.loop_conv.max_chs_per_mvin, max_chs_per_mvin);
 
     auto dram_stride = svs.loop_conv.out_channels.ZExt(64) * INPUT_TYPE_WIDTH_BYTES;
-         dram_stride = Ite(svs.loop_conv.dw, BvConst(INPUT_TYPE_WIDTH_BYTES, 64), dram_stride);
-         dram_stride = Ite(svs.loop_conv.trans_weight_1203, svs.loop_conv.kernel_dim.ZExt(64) * svs.loop_conv.kernel_dim.ZExt(64) * svs.loop_conv.out_channels.ZExt(64) * INPUT_TYPE_WIDTH_BYTES, dram_stride);
-         dram_stride = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.in_channels.ZExt(64) * INPUT_TYPE_WIDTH_BYTES, dram_stride);
+         dram_stride = Ite(svs.loop_conv.dw, BvConst(INPUT_TYPE_WIDTH_BYTES, 64), 
+         Ite(svs.loop_conv.trans_weight_1203, svs.loop_conv.kernel_dim.ZExt(64) * svs.loop_conv.kernel_dim.ZExt(64) * svs.loop_conv.out_channels.ZExt(64) * INPUT_TYPE_WIDTH_BYTES,
+         Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.in_channels.ZExt(64) * INPUT_TYPE_WIDTH_BYTES, dram_stride)));
 
     auto spad_block_stride = svs.loop_conv.krows * svs.loop_conv.kcols * Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.ochs, svs.loop_conv.kchs);
 
@@ -506,15 +507,15 @@ void DefineMvinWeights(Ila &child, gemmini_statevars_t &svs){
     auto K = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.ochs - svs.loop_conv.och, svs.loop_conv.kchs - svs.loop_conv.kch);
          K = Min(K, BvConst(ARRAY_DIM, 16));
     auto J = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.kchs - svs.loop_conv.kch, svs.loop_conv.ochs - svs.loop_conv.och);
-         J = Min(K, svs.loop_conv.max_chs_per_mvin);
+         J = Min(J, svs.loop_conv.max_chs_per_mvin);
 
     auto array_dim_const = BvConst(ARRAY_DIM, 16);
 
 
     auto B_dim_4                 = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.ochs, svs.loop_conv.kchs);
-    auto B_iter_4                = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.och, svs.loop_conv.kch);
-    auto B_iter_1                = Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.kch, svs.loop_conv.och) / array_dim_const;
-    std::vector<ExprRef> B_dims  = {svs.loop_conv.krows, svs.loop_conv.kcols, svs.loop_conv.kchs};
+    auto B_iter_4                = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.och, svs.loop_conv.kch);
+    auto B_iter_1                = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.kch, svs.loop_conv.och) / array_dim_const;
+    std::vector<ExprRef> B_dims  = {svs.loop_conv.krows, svs.loop_conv.kcols, B_dim_4};
     std::vector<ExprRef> B_iters = {B_iter_1, svs.loop_conv.krow, svs.loop_conv.kcol, B_iter_4};
     auto B_sp_addr               = svs.loop_conv.B_sp_addr_start + GetAddrOffset(B_dims, B_iters, 32);
 
@@ -531,22 +532,23 @@ void DefineMvinWeights(Ila &child, gemmini_statevars_t &svs){
     auto w = svs.loop_conv.weights + (GetAddrOffset({svs.loop_conv.kernel_dim, svs.loop_conv.in_channels}, 
                             {svs.loop_conv.krow, svs.loop_conv.kcol, svs.loop_conv.kch}, 64) * svs.loop_conv.out_channels.ZExt(64) + svs.loop_conv.och.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES; 
 
-    w = Ite(svs.loop_conv.dw, svs.loop_conv.weights + GetAddrOffset({svs.loop_conv.kernel_dim}, {svs.loop_conv.krow, svs.loop_conv.kcol}, 64) * INPUT_TYPE_WIDTH_BYTES, w);
-    w = Ite(svs.loop_conv.trans_weight_1203, svs.loop_conv.weights + (GetAddrOffset({svs.loop_conv.kernel_dim, svs.loop_conv.kernel_dim}, 
-                                            {svs.loop_conv.kch, svs.loop_conv.krow, svs.loop_conv.kcol}, 64) * svs.loop_conv.out_channels.ZExt(64) + svs.loop_conv.och.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES, w);
-    w = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.weights + (GetAddrOffset({svs.loop_conv.kernel_dim, svs.loop_conv.out_channels}, 
-                            {svs.loop_conv.krow, svs.loop_conv.kcol, svs.loop_conv.och}, 64) * svs.loop_conv.in_channels.ZExt(64) + svs.loop_conv.kch.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES, w); 
+    w = Ite(svs.loop_conv.dw, svs.loop_conv.weights + GetAddrOffset({svs.loop_conv.kernel_dim}, {svs.loop_conv.krow, svs.loop_conv.kcol}, 64) * INPUT_TYPE_WIDTH_BYTES, 
+    Ite(svs.loop_conv.trans_weight_1203, svs.loop_conv.weights + (GetAddrOffset({svs.loop_conv.kernel_dim, svs.loop_conv.kernel_dim}, 
+                                            {svs.loop_conv.kch, svs.loop_conv.krow, svs.loop_conv.kcol}, 64) * svs.loop_conv.out_channels.ZExt(64) + svs.loop_conv.och.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES, 
+    Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.weights + (GetAddrOffset({svs.loop_conv.kernel_dim, svs.loop_conv.out_channels}, 
+                            {svs.loop_conv.krow, svs.loop_conv.kcol, svs.loop_conv.och}, 64) * svs.loop_conv.in_channels.ZExt(64) + svs.loop_conv.kch.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES, w))); 
 
 
     CallMvin(instr, svs.load[1], w, B_sp_addr, K, J);
 
 
-    auto ocho_it = Ite(svs.loop_conv.trans_weight_0132, array_dim_const, svs.loop_conv.max_chs_per_mvin);
-    auto kch_it  = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.max_chs_per_mvin, array_dim_const);
+    auto och_it = Ite(svs.loop_conv.trans_weight_0132, array_dim_const, svs.loop_conv.max_chs_per_mvin);
+    auto kch_it = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.max_chs_per_mvin, array_dim_const);
     
-    std::vector<ExprRef> loop_vars = {svs.loop_conv.och, svs.loop_conv.krow, svs.loop_conv.kcol, svs.loop_conv.kch};
-    std::vector<ExprRef> loop_maxs = {svs.loop_conv.ochs, svs.loop_conv.krows, svs.loop_conv.kcols, svs.loop_conv.kchs};
-    auto last_pixel                = IterateLoopVars(instr, loop_vars, loop_maxs);
+    std::vector<ExprRef> loop_vars       = {svs.loop_conv.och, svs.loop_conv.krow, svs.loop_conv.kcol, svs.loop_conv.kch};
+    std::vector<ExprRef> loop_increments = {och_it, BvConst(1,16), BvConst(1,16), kch_it};
+    std::vector<ExprRef> loop_maxs       = {svs.loop_conv.ochs, svs.loop_conv.krows, svs.loop_conv.kcols, svs.loop_conv.kchs};
+    auto last_pixel                      = IterateLoopVars(instr, loop_vars, loop_increments, loop_maxs);
 
     instr.SetUpdate(svs.loop_conv.child_state, Ite(last_pixel, BvConst(loop_conv_ws_child_states::CONFIG_COMPUTE, 16), BvConst(loop_conv_ws_child_states::MVIN_WEIGHTS, 16)));
 
@@ -561,23 +563,46 @@ void DefineConfigCompute(Ila &child, gemmini_statevars_t &svs){
     instr.SetUpdate(svs.exec.a_stride, Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.irows *svs.loop_conv.icols, svs.exec.a_stride));
     instr.SetUpdate(svs.exec.c_stride, Ite(svs.loop_conv.trans_input_3120, svs.loop_conv.orows *svs.loop_conv.ocols, svs.exec.c_stride));
 
-    auto goto_iterocol = svs.loop_conv.input_dilated & (Mod(svs.loop_conv.upad, BvConst(2, 16)) != 0);
-
     instr.SetUpdate(svs.loop_conv.child_state, 
-        Ite(goto_iterocol, BvConst(loop_conv_ws_child_states::ITERATE_OCOL, 16),
+        Ite(svs.loop_conv.input_dilated == 1, BvConst(loop_conv_ws_child_states::ADJUST_STATEVARS_FOR_INPUT_DILATION, 16),
         BvConst(loop_conv_ws_child_states::CONFIG_PRELOAD_CONV, 16)));
 }
-void DefineIterateOcol(Ila &child, gemmini_statevars_t &svs){
+void DefineAdjustStatevarsForInputDilation(Ila &child, gemmini_statevars_t &svs){
 
     // Define instruction
-    auto instr = child.NewInstr("loop_conv_ws_ITERATE_OCOL");
-    instr.SetDecode(svs.loop_conv.child_state == BvConst(loop_conv_ws_child_states::ITERATE_OCOL, svs.loop_conv.child_state.bit_width()));
+    auto instr = child.NewInstr("loop_conv_ws_adjust_statevars_for_input_dilation");
+    instr.SetDecode(svs.loop_conv.child_state == BvConst(loop_conv_ws_child_states::ADJUST_STATEVARS_FOR_INPUT_DILATION, svs.loop_conv.child_state.bit_width()));
+
+
+    instr.SetUpdate(svs.loop_conv.new_weights, svs.loop_conv.new_weights | (svs.loop_conv.b == 0 & svs.loop_conv.orow == 0 & svs.loop_conv.ocol == 0));
     
-    // Update statevars
-    instr.SetUpdate(svs.loop_conv.ocol, svs.loop_conv.ocol + 1);
-    instr.SetUpdate(svs.loop_conv.child_state,  BvConst(loop_conv_ws_child_states::CONFIG_PRELOAD_CONV, 16));
+    auto array_dim_const = BvConst(ARRAY_DIM, 16);
+    auto const_one       = BvConst(1, 16);
+    
+    auto iter_ocol = (Mod(svs.loop_conv.kcol * svs.loop_conv.kernel_dilation + svs.loop_conv.ocol - svs.loop_conv.lpad, BvConst(2, 16)) != 0);
+    auto iter_orow = (Mod(svs.loop_conv.krow * svs.loop_conv.kernel_dilation + svs.loop_conv.orow - svs.loop_conv.upad, BvConst(2, 16)) != 0);
+    
+    auto exit_state_without_iteration = (!iter_orow) & (!iter_ocol);
+    auto ocol_it                      = Ite(exit_state_without_iteration, BvConst(0, 16), const_one);
+
+    auto b_it                            = Ite(svs.loop_conv.trans_input_3120, array_dim_const, const_one);
+    std::vector<ExprRef> iter_vars       = {svs.loop_conv.och, svs.loop_conv.krow, svs.loop_conv.kcol, svs.loop_conv.kch, svs.loop_conv.b, svs.loop_conv.orow, svs.loop_conv.ocol};
+    std::vector<ExprRef> iter_increments = {array_dim_const, const_one, svs.loop_conv.max_pixels_per_row.ZExt(16), array_dim_const, b_it, const_one, ocol_it};
+    std::vector<ExprRef> iter_maxs       = {svs.loop_conv.ochs, svs.loop_conv.krows, svs.loop_conv.kcols, svs.loop_conv.kchs, svs.loop_conv.batches, svs.loop_conv.orows, svs.loop_conv.ocols};
+    auto last_pixel                      = IterateLoopVars(instr, iter_vars, iter_increments, iter_maxs);
+
+    auto next_state    = Ite(last_pixel, 
+                        Ite(svs.loop_conv.output == 0,  BvConst(loop_conv_ws_child_states::LOOP_CONV_WS_INACTIVE, 16),
+                            Ite(svs.loop_conv.no_pool, BvConst(loop_conv_ws_child_states::MVOUT_RESULTS_NOPOOL, 16),
+                                                        BvConst(loop_conv_ws_child_states::CONFIG_MVOUT_RESULTS_POOL, 16))),
+                        Ite(exit_state_without_iteration, BvConst(loop_conv_ws_child_states::CONFIG_PRELOAD_CONV, 16),
+                                                        BvConst(loop_conv_ws_child_states::ADJUST_STATEVARS_FOR_INPUT_DILATION, 16))); 
+    
+    instr.SetUpdate(svs.loop_conv.child_state, next_state);
+
 }
-void DefineConfigPreloadCol(Ila &child, gemmini_statevars_t &svs){
+
+void DefineConfigPreloadConv(Ila &child, gemmini_statevars_t &svs){
 
     // Define instruction
     auto instr = child.NewInstr("loop_conv_ws_CONFIG_PRELOAD_CONV");
@@ -585,7 +610,15 @@ void DefineConfigPreloadCol(Ila &child, gemmini_statevars_t &svs){
     
     auto irow = _UNDILATED(svs.loop_conv.orow *svs.loop_conv.stride + svs.loop_conv.krow * svs.loop_conv.kernel_dilation, svs.loop_conv.input_dilated);
     auto icol = _UNDILATED(svs.loop_conv.ocol *svs.loop_conv.stride + svs.loop_conv.kcol * svs.loop_conv.kernel_dilation, svs.loop_conv.input_dilated);
-    
+    instr.SetUpdate(svs.loop_conv.irow, irow);
+    instr.SetUpdate(svs.loop_conv.icol, icol);
+
+    //     auto irow = svs.loop_conv.orow *svs.loop_conv.stride + svs.loop_conv.krow * svs.loop_conv.kernel_dilation;
+    // auto icol = svs.loop_conv.ocol *svs.loop_conv.stride + svs.loop_conv.kcol * svs.loop_conv.kernel_dilation;
+    // irow = Ite(svs.loop_conv.input_dilated == 1, (irow + BvConst(1, 16)) / BvConst(2, 16), irow);
+    // icol = Ite(svs.loop_conv.input_dilated == 1, (icol + BvConst(1, 16)) / BvConst(2, 16), icol);
+
+
     auto array_dim_const = BvConst(ARRAY_DIM, 16);
     auto C_sp_addr       = svs.loop_conv.C_sp_addr_start + GetAddrOffset({svs.loop_conv.batches, svs.loop_conv.orows, svs.loop_conv.ocols},
                                                                     {svs.loop_conv.och / array_dim_const, svs.loop_conv.b,  svs.loop_conv.orow, svs.loop_conv.ocol}, 32);
@@ -610,8 +643,10 @@ void DefineConfigPreloadCol(Ila &child, gemmini_statevars_t &svs){
                                                                 {svs.loop_conv.och / array_dim_const, krow_, kcol_, svs.loop_conv.och}, 32);
     B_sp_addr = Ite(svs.loop_conv.trans_weight_0132, svs.loop_conv.B_sp_addr_start + GetAddrOffset({svs.loop_conv.krows, svs.loop_conv.kcols, svs.loop_conv.ochs},
                                                                 {svs.loop_conv.kch / array_dim_const, krow_, kcol_, svs.loop_conv.och}, 32), B_sp_addr);
+    auto new_weights_next = svs.loop_conv.new_weights | (svs.loop_conv.b == 0 & svs.loop_conv.orow == 0 & svs.loop_conv.ocol == 0);
+    instr.SetUpdate(svs.loop_conv.new_weights, new_weights_next);
     
-    auto pre_sp_addr = Ite(svs.loop_conv.new_weights == 1, B_sp_addr, BvConst(-1, 32));
+    auto pre_sp_addr = Ite(new_weights_next, B_sp_addr, BvConst(-1, 32));
     auto out_sp_addr = C_sp_addr;
 
     instr.SetUpdate(svs.exec.preload_sp_addr, pre_sp_addr);
@@ -621,7 +656,7 @@ void DefineConfigPreloadCol(Ila &child, gemmini_statevars_t &svs){
     instr.SetUpdate(svs.exec.output_rows, I);
     instr.SetUpdate(svs.exec.output_cols, J);
 
-    instr.SetUpdate(svs.loop_conv.new_weights, svs.loop_conv.b == 0);
+    
     
     instr.SetUpdate(svs.loop_conv.child_state, BvConst(loop_conv_ws_child_states::COMPUTE_CONV, 16));
     
@@ -647,7 +682,7 @@ void DefineComputeConv(Ila &child, gemmini_statevars_t &svs){
     instr.SetUpdate(svs.exec.args.a.cols, svs.loop_conv.K);
     instr.SetUpdate(svs.exec.args.bd.addr, ~BvConst(0,32));
     instr.SetUpdate(svs.exec.args.bd.rows, svs.loop_conv.I);
-    instr.SetUpdate(svs.exec.args.bd.cols, svs.loop_conv.K);
+    instr.SetUpdate(svs.exec.args.bd.cols, svs.loop_conv.J);
 
     // Call compute child instruction
     auto compute_matmul_start = Ite(svs.loop_conv.new_weights == 1, BvConst(compute_child_states::PRELOAD, 16), 
@@ -664,12 +699,11 @@ void DefineComputeConv(Ila &child, gemmini_statevars_t &svs){
     std::vector<ExprRef> iter_maxs       = {svs.loop_conv.ochs, svs.loop_conv.krows, svs.loop_conv.kcols, svs.loop_conv.kchs, svs.loop_conv.batches, svs.loop_conv.orows, svs.loop_conv.ocols};
     auto last_pixel                      = IterateLoopVars(instr, iter_vars, iter_increments, iter_maxs);
                                             
-    auto goto_iterocol = svs.loop_conv.input_dilated & (Mod(svs.loop_conv.krow * svs.loop_conv.kernel_dilation + svs.loop_conv.orow - svs.loop_conv.upad, BvConst(2, 16)) != 0);
     auto next_state    = Ite(last_pixel, 
                         Ite(svs.loop_conv.output == 0,  BvConst(loop_conv_ws_child_states::LOOP_CONV_WS_INACTIVE, 16),
                             Ite(svs.loop_conv.no_pool, BvConst(loop_conv_ws_child_states::MVOUT_RESULTS_NOPOOL, 16),
                                                         BvConst(loop_conv_ws_child_states::CONFIG_MVOUT_RESULTS_POOL, 16))),
-                        Ite(goto_iterocol, BvConst(loop_conv_ws_child_states::ITERATE_OCOL, 16),
+                        Ite(svs.loop_conv.input_dilated == 1, BvConst(loop_conv_ws_child_states::ADJUST_STATEVARS_FOR_INPUT_DILATION, 16),
                                             BvConst(loop_conv_ws_child_states::CONFIG_PRELOAD_CONV, 16)));
     instr.SetUpdate(svs.loop_conv.child_state, next_state);
 
@@ -689,23 +723,23 @@ void DefineMvoutResultsNoPool(Ila &child, gemmini_statevars_t &svs){
                                                                     {svs.loop_conv.och/array_dim_const, svs.loop_conv.b, svs.loop_conv.orow, svs.loop_conv.ocol}, 32);
     auto out = svs.loop_conv.output + (GetAddrOffset({svs.loop_conv.out_dim, svs.loop_conv.out_dim}, 
                                         {svs.loop_conv.b, svs.loop_conv.orow, svs.loop_conv.ocol}, 64) * svs.loop_conv.out_channels.ZExt(64) + svs.loop_conv.och.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES;
-    out = Ite(svs.loop_conv.trans_output_1203, svs.loop_conv.output + (GetAddrOffset({svs.loop_conv.out_dim, svs.loop_conv.out_dim}, 
+    out = Ite(svs.loop_conv.trans_output_1203, svs.loop_conv.output + (GetAddrOffset({svs.loop_conv.out_dim, svs.loop_conv.batch_size}, 
                                         {svs.loop_conv.orow, svs.loop_conv.ocol, svs.loop_conv.b}, 64) * svs.loop_conv.out_channels.ZExt(64) + svs.loop_conv.och.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES,
                                         out);  
 
     instr.SetUpdate(svs.store.soc_mem_base_address, out);
     instr.SetUpdate(svs.store.num_rows, I);
     instr.SetUpdate(svs.store.num_cols, J);
-    instr.SetUpdate(svs.store.is_acc_addr, SelectBit(svs.loop_ws.C_sp_addr, 31) == 1);
-    instr.SetUpdate(svs.store.read_acctype, SelectBit(svs.loop_ws.C_sp_addr, 29) == 1);
-    instr.SetUpdate(svs.store.src_base_address, Extract(svs.loop_ws.C_sp_addr, 28, 0));
+    instr.SetUpdate(svs.store.is_acc_addr, SelectBit(svs.loop_conv.C_sp_addr_start, 31) == 1);
+    instr.SetUpdate(svs.store.read_acctype, SelectBit(svs.loop_conv.C_sp_addr_start, 29) == 1);
+    instr.SetUpdate(svs.store.src_base_address, Extract(c_sp_addr, 28, 0));
     instr.SetUpdate(svs.store.child_valid, BoolConst(true));
 
-    auto const_one = BvConst(1, 16);
+    auto const_one                       = BvConst(1, 16);
     std::vector<ExprRef> iter_vars       = {svs.loop_conv.b, svs.loop_conv.orow, svs.loop_conv.ocol, svs.loop_conv.och};
     std::vector<ExprRef> iter_increments = {const_one, const_one, array_dim_const, array_dim_const};
     std::vector<ExprRef> iter_maxs       = {svs.loop_conv.batches, svs.loop_conv.orows, svs.loop_conv.ocols, svs.loop_conv.ochs};
-    auto last_pixel = IterateLoopVars(instr, iter_vars, iter_increments, iter_maxs);
+    auto last_pixel                      = IterateLoopVars(instr, iter_vars, iter_increments, iter_maxs);
 
     instr.SetUpdate(svs.loop_conv.child_state, Ite(last_pixel, BvConst(loop_conv_ws_child_states::LOOP_CONV_WS_INACTIVE, 16),
                                                                 BvConst(loop_conv_ws_child_states::MVOUT_RESULTS_NOPOOL, 16)));
@@ -740,7 +774,7 @@ void DefineMvoutResultsPool(Ila &child, gemmini_statevars_t &svs){
     
     // Update statevars
     auto array_dim_const = BvConst(ARRAY_DIM, 16);
-    auto channels = Min(svs.loop_conv.och + array_dim_const, svs.loop_conv.ochs);
+    auto channels        = Min(svs.loop_conv.och + array_dim_const, svs.loop_conv.ochs);
 
     auto C_sp_addr = svs.loop_conv.C_sp_addr_start + (svs.loop_conv.och / array_dim_const).ZExt(32) * svs.loop_conv.batches.ZExt(32)* svs.loop_conv.orows.ZExt(32) * svs.loop_conv.ocols.ZExt(32) +
                                                     svs.loop_conv.b.ZExt(32) * svs.loop_conv.orows.ZExt(32) * svs.loop_conv.ocols.ZExt(32);
@@ -748,13 +782,15 @@ void DefineMvoutResultsPool(Ila &child, gemmini_statevars_t &svs){
     auto dram_addr = svs.loop_conv.output + ((svs.loop_conv.b.ZExt(64) * svs.loop_conv.pool_out_dim.ZExt(64) *svs.loop_conv.pool_out_dim.ZExt(64)) * svs.loop_conv.out_channels.ZExt(64) + svs.loop_conv.och.ZExt(64)) * INPUT_TYPE_WIDTH_BYTES;
     instr.SetUpdate(svs.store.soc_mem_base_address, dram_addr);
     instr.SetUpdate(svs.store.num_cols, channels);
-    instr.SetUpdate(svs.store.src_base_address, C_sp_addr);
+    instr.SetUpdate(svs.store.src_base_address, Extract(C_sp_addr, 28, 0));
+    instr.SetUpdate(svs.store.is_acc_addr, Extract(C_sp_addr, 31, 31) == 1);
+    instr.SetUpdate(svs.store.read_acctype, Extract(C_sp_addr, 29, 29) == 1);
     instr.SetUpdate(svs.store.child_valid, BoolConst(true));
 
     std::vector<ExprRef> iter_vars       = {svs.loop_conv.b, svs.loop_conv.och};
     std::vector<ExprRef> iter_increments = {BvConst(1, 16), BvConst(ARRAY_DIM, 16)};
     std::vector<ExprRef> iter_maxs       = {svs.loop_conv.batches, svs.loop_conv.ochs};
-    auto last_pixel = IterateLoopVars(instr, iter_vars, iter_increments, iter_maxs);
+    auto last_pixel                      = IterateLoopVars(instr, iter_vars, iter_increments, iter_maxs);
 
     instr.SetUpdate(svs.loop_conv.child_state, Ite(last_pixel, BvConst(loop_conv_ws_child_states::CONFIG_RESET_MVOUT_RESULTS, 16), 
                                                                svs.loop_conv.child_state));
@@ -766,18 +802,7 @@ void DefineConfigResetMvoutResults(Ila &child, gemmini_statevars_t &svs){
     auto instr = child.NewInstr("loop_conv_ws_CONFIG_RESET_MVOUT_RESULTS");
     instr.SetDecode(svs.loop_conv.child_state == BvConst(loop_conv_ws_child_states::CONFIG_RESET_MVOUT_RESULTS, svs.loop_conv.child_state.bit_width()));
     
-    // Update statevars
-    //     store_statevars.maxpool_params.enable_and_stride = m.NewBvState("store_maxpool_enable_and_stride", 2);
-    // store_statevars.maxpool_params.window_size       = m.NewBvState("store_maxpool_window_size", 2);
-    // store_statevars.maxpool_params.upper_pad         = m.NewBvState("store_maxpool_upper_pad", 2);
-    // store_statevars.maxpool_params.left_pad          = m.NewBvState("store_maxpool_left_pad", 2);
-    // store_statevars.maxpool_params.out_dim           = m.NewBvState("store_maxpool_out_dim", 8);
-    // store_statevars.maxpool_params.in_rows           = m.NewBvState("store_maxpool_in_rows", 8);
-    // store_statevars.maxpool_params.in_cols           = m.NewBvState("store_maxpool_in_cols", 8);
-    // store_statevars.maxpool_params.out_rows          = m.NewBvState("store_maxpool_out_rows", 8);
-    // store_statevars.maxpool_params.out_cols          = m.NewBvState("store_maxpool_out_cols", 8);
-
-    auto const_zero_twobits = BvConst(0, 2);
+    auto const_zero_twobits   = BvConst(0, 2);
     auto const_zero_eightbits = const_zero_twobits.ZExt(8);
     instr.SetUpdate(svs.store.maxpool_params.out_cols, const_zero_eightbits);
     instr.SetUpdate(svs.store.maxpool_params.out_rows, const_zero_eightbits);

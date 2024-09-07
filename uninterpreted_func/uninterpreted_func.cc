@@ -39,7 +39,7 @@ sc_biguint<8> Gemmini::ScaleInputType(sc_biguint<8> input,sc_biguint<32> scale){
 }
 
 
-sc_biguint<32> Gemmini::ScaleAccType(sc_biguint<32> input,sc_biguint<32> scale){
+sc_biguint<8> Gemmini::ScaleAccType(sc_biguint<32> input,sc_biguint<32> scale){
   
   // bitcast scale to float
   ac_ieee_float32 scale_ac_float = _bit_cast<float, uint32_t>(scale.to_uint());
@@ -54,11 +54,11 @@ sc_biguint<32> Gemmini::ScaleAccType(sc_biguint<32> input,sc_biguint<32> scale){
   // Cast to int with rounding to the nearest integer
   auto result_double  = result_float64.to_double();
   auto result_rounded = std::nearbyint(result_double);
-  auto result_clamped = result_rounded > INT32_MAX ? INT32_MAX : (result_rounded < INT32_MIN ? INT32_MIN : result_rounded);
-  auto result_int     = static_cast<int32_t>(result_clamped);
+  auto result_clamped = result_rounded > INT8_MAX ? INT8_MAX : (result_rounded < INT8_MIN ? INT8_MIN : result_rounded);
+  auto result_int     = static_cast<int8_t>(result_clamped);
   
   // Cast back to sc_biguint
-  sc_biguint<32> out(result_int);
+  sc_biguint<8> out(result_int);
   return out;
 }
 

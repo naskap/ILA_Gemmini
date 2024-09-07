@@ -120,7 +120,7 @@ static auto scale = SortRef::BV(32);
 static auto inputtype_sort = SortRef::BV(INPUT_TYPE_WIDTH_BITS);
 static auto acctype_sort = SortRef::BV(ACC_TYPE_WIDTH_BITS);
 static FuncRef ScaleInputType("ScaleInputType", inputtype_sort, inputtype_sort, scale);
-static FuncRef ScaleAccType("ScaleAccType", acctype_sort, acctype_sort, scale);
+static FuncRef ScaleAccType("ScaleAccType", inputtype_sort, acctype_sort, scale);
 
 }; // namespace Gemmini
 

@@ -13,7 +13,7 @@ enum loop_conv_ws_child_states {
     CONFIG_MVIN_WEIGHTS,
     MVIN_WEIGHTS, 
     CONFIG_COMPUTE, 
-    ITERATE_OCOL, 
+    ADJUST_STATEVARS_FOR_INPUT_DILATION, 
     CONFIG_PRELOAD_CONV, 
     COMPUTE_CONV,
     MVOUT_RESULTS_NOPOOL,
@@ -39,8 +39,8 @@ void DefineMvinInput(Ila &child, gemmini_statevars_t &svs);
 void DefineConfigMvinWeights(Ila &child, gemmini_statevars_t &svs);
 void DefineMvinWeights(Ila &child, gemmini_statevars_t &svs);
 void DefineConfigCompute(Ila &child, gemmini_statevars_t &svs);
-void DefineIterateOcol(Ila &child, gemmini_statevars_t &svs);
-void DefineConfigPreloadCol(Ila &child, gemmini_statevars_t &svs);
+void DefineAdjustStatevarsForInputDilation(Ila &child, gemmini_statevars_t &svs);
+void DefineConfigPreloadConv(Ila &child, gemmini_statevars_t &svs);
 void DefineComputeConv(Ila &child, gemmini_statevars_t &svs);
 void DefineMvoutResultsNoPool(Ila &child, gemmini_statevars_t &svs);
 void DefineConfigMvoutResultsPool(Ila &child, gemmini_statevars_t &svs);
