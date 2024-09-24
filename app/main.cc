@@ -3,7 +3,7 @@
 #include <iostream>
 #include <cstdlib> 
 
-#include <Gemmini/Gemmini.h>
+#include <Gemmini/gemmini_base.h>
 
 using namespace ilang;
 
