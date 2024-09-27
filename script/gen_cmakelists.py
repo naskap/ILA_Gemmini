@@ -41,7 +41,7 @@ ${{extern_src}}
 )
 
 target_include_directories(Gemmini_lib PRIVATE include)
-target_include_directories(Gemmini_lib PRIVATE /home/nathan/sandbox/code/usr/ac_types/include)
+target_include_directories(Gemmini_lib PRIVATE ../../uninterpreted_func/ac_types/include)
 target_link_libraries(Gemmini_lib SystemC::systemc)
 
 

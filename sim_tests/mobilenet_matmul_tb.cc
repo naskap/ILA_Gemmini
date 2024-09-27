@@ -40,25 +40,6 @@ SC_MODULE(Testbench){
 
     gemmini_flush(0);
 
-        // g.instr_log.open("./instr_log.txt",std::ofstream::out);
-    // g.instr_update_log.open("./instr_update_log", std::ofstream::out);
-    status = test_status::UNFINISHED;
-  }
-  void tb_thread(){
-  
-  int argc = 1;
-  char *argv[] = {const_cast<char*>("./Gemmini_test_mobilenet")};
-
-  
-#ifndef BAREMETAL
-    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
-      perror("mlockall failed");
-      status = 1; return;
-    }
-#endif
-
-    gemmini_flush(0);
-
     enum tiled_matmul_type_t tiled_matmul_type = WS;
     bool conv = false;
     bool check = true;
