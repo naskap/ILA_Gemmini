@@ -21,7 +21,7 @@ def gen_cmakelists(sim_folder : str):
     # src_list = [os.path.join("${CMAKE_CURRENT_SOURCE_DIR}/src", fname) for fname in os.listdir(src_folder)]
     # srcs = "\n".join(src_list)
 
-    return f"""# CMakeLists.txt for Gemmini
+    return """# CMakeLists.txt for Gemmini
 cmake_minimum_required(VERSION 3.14.0)
 project(Gemmini LANGUAGES CXX)
 
@@ -36,7 +36,7 @@ aux_source_directory(extern extern_src)
 
 add_library(Gemmini_lib
 ${{extern_src}}
-{srcs}
+{}
 ../../uninterpreted_func/uninterpreted_func.cc
 )
 
@@ -83,7 +83,7 @@ if(${{JSON_SUPPORT}})
   FetchContent_MakeAvailable(json)
   target_link_libraries(Gemmini nlohmann_json::nlohmann_json)
 endif()
-"""
+""".format(srcs)
 
 if __name__ == "__main__":
     print(gen_cmakelists("../build/sim_model11"))

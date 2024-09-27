@@ -13,13 +13,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     sim_folder = args.name
-    assert os.path.exists(sim_folder), f"Simulation folder {sim_folder} doesn't exist!"
+    assert os.path.exists(sim_folder), "Simulation folder {} doesn't exist!".format(sim_folder)
     
     # Copy tests to sim_folder
     sim_tests = os.path.join(ILA_Gemmini_root,"sim_tests")
+    shutil.rmtree(os.path.join(sim_folder, "app"))
     shutil.copytree(src=sim_tests, \
-                    dst=os.path.join(sim_folder, "app"), 
-                    dirs_exist_ok=True)
+                    dst=os.path.join(sim_folder, "app"))
 
     # Copy a test runner utility script
     shutil.copy(src=os.path.join(ILA_Gemmini_root,"script/test_runner.sh"),
