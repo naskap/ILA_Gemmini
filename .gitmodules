@@ -1,0 +1,3 @@
+[submodule "uninterpreted_func/ac_types"]
+	path = uninterpreted_func/ac_types
+	url = https://github.com/hlslibs/ac_types.git
